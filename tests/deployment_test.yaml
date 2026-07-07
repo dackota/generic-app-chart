@@ -250,6 +250,69 @@ tests:
       - notExists:
           path: spec.template.spec.containers[0].readinessProbe.tcpSocket
 
+  - it: renders a probe path containing a literal colon-space instead of crashing the chart (CRITICAL #1)
+    template: deployment.yaml
+    set:
+      readinessProbe:
+        path: "/healthz: bad"
+        port: 8080
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.httpGet.path
+          value: "/healthz: bad"
+
+  - it: passes a non-scalar extra Probe field through the shorthand without mangling it (CRITICAL #1)
+    template: deployment.yaml
+    set:
+      readinessProbe:
+        path: /ready
+        port: 8080
+        httpHeaders:
+          - name: X-Custom
+            value: foo
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.httpGet.path
+          value: /ready
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.httpHeaders
+          value:
+            - name: X-Custom
+              value: foo
+
+  - it: omits stray shorthand keys from a raw probe block instead of leaking them as invalid siblings (MEDIUM)
+    template: deployment.yaml
+    set:
+      readinessProbe:
+        httpGet:
+          path: /ready
+          port: 9092
+        path: stale-shorthand-value
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.httpGet.path
+          value: /ready
+      - notExists:
+          path: spec.template.spec.containers[0].readinessProbe.path
+
+  - it: honors an explicit port 0 in the probe shorthand instead of falling back to the primary service port (HIGH)
+    template: deployment.yaml
+    set:
+      startupProbe:
+        port: 0
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].startupProbe.tcpSocket.port
+          value: 0
+
+  - it: fails fast instead of rendering a broken empty-port probe when service.ports is empty (CRITICAL #2)
+    template: deployment.yaml
+    set:
+      service.ports: []
+    asserts:
+      - failedTemplate:
+          errorMessage: "generic-app-chart: readinessProbe has no port to probe — set service.ports or the probe's own port field"
+
   - it: configuring probes never alters the security context or other pod fields (R36)
     template: deployment.yaml
     set:

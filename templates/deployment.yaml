@@ -6,9 +6,9 @@ port-less probe shorthand — see templates/_probes.tpl. */}}
 {{- if .Values.service.ports -}}
 {{- $primaryPort = (first .Values.service.ports).targetPort -}}
 {{- end -}}
-{{- $livenessProbe := include "generic-app-chart.probe" (dict "value" .Values.livenessProbe "port" $primaryPort "default" false) -}}
-{{- $readinessProbe := include "generic-app-chart.probe" (dict "value" .Values.readinessProbe "port" $primaryPort "default" true) -}}
-{{- $startupProbe := include "generic-app-chart.probe" (dict "value" .Values.startupProbe "port" $primaryPort "default" false) -}}
+{{- $livenessProbe := include "generic-app-chart.probe" (dict "value" .Values.livenessProbe "port" $primaryPort "default" false "name" "livenessProbe") -}}
+{{- $readinessProbe := include "generic-app-chart.probe" (dict "value" .Values.readinessProbe "port" $primaryPort "default" true "name" "readinessProbe") -}}
+{{- $startupProbe := include "generic-app-chart.probe" (dict "value" .Values.startupProbe "port" $primaryPort "default" false "name" "startupProbe") -}}
 apiVersion: apps/v1
 kind: Deployment
 metadata:

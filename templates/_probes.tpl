@@ -15,9 +15,17 @@ priority order:
      would cause restart loops, so those stay opt-in with no fallback.
 
 Takes a dict: value (the values.yaml probe entry), port (the primary service
-port, i.e. service.ports[0].targetPort), default (bool). Returns the probe
-body (everything nested under livenessProbe:/readinessProbe:/startupProbe:)
-or an empty string when the probe should be omitted entirely.
+port, i.e. service.ports[0].targetPort), default (bool), name (the probe
+field's name, e.g. "readinessProbe" — used only for the fail message below).
+Returns the probe body (everything nested under
+livenessProbe:/readinessProbe:/startupProbe:) or an empty string when the
+probe should be omitted entirely.
+
+The shorthand body (and any pass-through extra fields) is always assembled as
+a Go dict and rendered via toYaml — never by hand-formatting strings — so
+arbitrary scalar/non-scalar values (a path containing ": ", a list-valued
+field, ...) always round-trip as valid YAML instead of risking a broken
+render or a crash.
 */}}
 {{- define "generic-app-chart.probe" -}}
 {{- $value := .value -}}
@@ -26,22 +34,27 @@ or an empty string when the probe should be omitted entirely.
 {{- if hasKey $value . -}}{{- $isRaw = true -}}{{- end -}}
 {{- end -}}
 {{- if $isRaw -}}
-{{- toYaml $value -}}
+{{/* A raw block wins outright; drop any stray shorthand keys (path/port)
+that may have been left in the same map so they don't leak into the output
+as invalid sibling fields alongside httpGet/tcpSocket/exec/grpc. */}}
+{{- toYaml (omit $value "path" "port") -}}
 {{- else if or (hasKey $value "path") (hasKey $value "port") .default -}}
-{{- $port := $value.port | default .port -}}
+{{/* Presence-check the port explicitly (hasKey), not `default`/truthiness:
+Sprig's `default` treats an explicit `port: 0` as empty and would silently
+replace it with the primary service port. */}}
+{{- $port := .port -}}
+{{- if hasKey $value "port" -}}
+{{- $port = $value.port -}}
+{{- else if not $port -}}
+{{- fail (printf "generic-app-chart: %s has no port to probe — set service.ports or the probe's own port field" (.name | default "this probe")) -}}
+{{- end -}}
 {{- $extra := omit $value "path" "port" -}}
-{{- $lines := list -}}
+{{- $shorthand := dict -}}
 {{- if hasKey $value "path" -}}
-{{- $lines = append $lines "httpGet:" -}}
-{{- $lines = append $lines (printf "  path: %s" $value.path) -}}
-{{- $lines = append $lines (printf "  port: %v" $port) -}}
+{{- $shorthand = dict "httpGet" (dict "path" $value.path "port" $port) -}}
 {{- else -}}
-{{- $lines = append $lines "tcpSocket:" -}}
-{{- $lines = append $lines (printf "  port: %v" $port) -}}
+{{- $shorthand = dict "tcpSocket" (dict "port" $port) -}}
 {{- end -}}
-{{- range $k, $v := $extra -}}
-{{- $lines = append $lines (printf "%s: %v" $k $v) -}}
-{{- end -}}
-{{- join "\n" $lines -}}
+{{- toYaml (merge $shorthand $extra) -}}
 {{- end -}}
 {{- end -}}
