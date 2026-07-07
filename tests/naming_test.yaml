@@ -82,3 +82,54 @@ tests:
       - equal:
           path: spec.template.metadata.labels["app.kubernetes.io/instance"]
           value: my-app
+
+  # R39: commonLabels flow through the shared labels helper, so every
+  # resource that calls it (asserted here against the Deployment; other
+  # modules' suites re-assert the same helper output as each resource adds
+  # its own test coverage) picks up commonLabels automatically.
+  - it: merges commonLabels into the resource's labels (R39)
+    set:
+      commonLabels:
+        team: platform
+        cost-center: "1234"
+    asserts:
+      - equal:
+          path: metadata.labels["team"]
+          value: platform
+      - equal:
+          path: metadata.labels["cost-center"]
+          value: "1234"
+
+  # R39 property test: commonLabels must never be able to clobber the
+  # chart-managed keys that selectors and provenance depend on — exhaustively
+  # exercise every chart-managed label key, since a merge-order regression on
+  # any one of them would silently break selection or version tracking.
+  - it: never lets commonLabels override any chart-managed label key (R39)
+    release:
+      name: my-app
+    chart:
+      version: 1.2.3
+      appVersion: "9.9.9"
+    set:
+      commonLabels:
+        app.kubernetes.io/name: hijacked
+        app.kubernetes.io/instance: hijacked
+        app.kubernetes.io/version: hijacked
+        app.kubernetes.io/managed-by: hijacked
+        helm.sh/chart: hijacked
+    asserts:
+      - equal:
+          path: metadata.labels["app.kubernetes.io/name"]
+          value: generic-app-chart
+      - equal:
+          path: metadata.labels["app.kubernetes.io/instance"]
+          value: my-app
+      - equal:
+          path: metadata.labels["app.kubernetes.io/version"]
+          value: "9.9.9"
+      - equal:
+          path: metadata.labels["app.kubernetes.io/managed-by"]
+          value: Helm
+      - equal:
+          path: metadata.labels["helm.sh/chart"]
+          value: generic-app-chart-1.2.3

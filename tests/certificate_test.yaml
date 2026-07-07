@@ -61,3 +61,21 @@ tests:
       - equal:
           path: spec.issuerRef.name
           value: custom-issuer
+
+  # R39 generic metadata passthrough.
+  - it: adds commonLabels and commonAnnotations to the Certificate (R39)
+    set:
+      routing:
+        enabled: true
+        hostnames: ["my-app.dackota.dev"]
+      commonLabels:
+        team: platform
+      commonAnnotations:
+        owner: platform-team
+    asserts:
+      - equal:
+          path: metadata.labels["team"]
+          value: platform
+      - equal:
+          path: metadata.annotations["owner"]
+          value: platform-team

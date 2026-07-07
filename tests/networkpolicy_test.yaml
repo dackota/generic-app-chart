@@ -77,3 +77,20 @@ tests:
               ports:
                 - protocol: UDP
                   port: 53
+
+  # R39 generic metadata passthrough.
+  - it: adds commonLabels and commonAnnotations to the NetworkPolicy (R39)
+    set:
+      networkPolicy:
+        enabled: true
+      commonLabels:
+        team: platform
+      commonAnnotations:
+        owner: platform-team
+    asserts:
+      - equal:
+          path: metadata.labels["team"]
+          value: platform
+      - equal:
+          path: metadata.annotations["owner"]
+          value: platform-team

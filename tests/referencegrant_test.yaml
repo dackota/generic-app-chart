@@ -92,3 +92,26 @@ tests:
             group: ""
             kind: Service
             name: my-app-generic-app-chart
+
+  # R39 generic metadata passthrough.
+  - it: adds commonLabels and commonAnnotations to the ReferenceGrant (R39)
+    release:
+      name: my-app
+      namespace: my-app-ns
+    set:
+      routing:
+        enabled: true
+        hostnames: ["my-app.dackota.dev"]
+        gateway:
+          namespace: traefik
+      commonLabels:
+        team: platform
+      commonAnnotations:
+        owner: platform-team
+    asserts:
+      - equal:
+          path: metadata.labels["team"]
+          value: platform
+      - equal:
+          path: metadata.annotations["owner"]
+          value: platform-team

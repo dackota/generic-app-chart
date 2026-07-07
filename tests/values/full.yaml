@@ -47,3 +47,15 @@ networkPolicy:
     namespaceSelector:
       matchLabels:
         kubernetes.io/metadata.name: traefik
+
+# R39: generic metadata passthrough, exercised alongside every other feature.
+commonLabels:
+  cost-center: ctd
+commonAnnotations:
+  owner: platform-team
+podAnnotations:
+  vault.hashicorp.com/agent-inject: "true"
+podLabels:
+  tier: web
+serviceAnnotations:
+  external-dns.alpha.kubernetes.io/hostname: ctd.dackota.dev

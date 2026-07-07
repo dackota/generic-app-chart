@@ -80,6 +80,16 @@ resources:
     cpu: 500m
     memory: 256Mi
 
+# R39: generic metadata passthrough. podAnnotations/podLabels apply to the pod
+# template only; commonLabels/commonAnnotations apply to every resource this
+# chart renders. All four are merged with (and always overridden by) this
+# chart's managed labels/annotations — selector labels and the checksum/config
+# annotation (R17) can never be clobbered by a user-supplied key.
+podAnnotations: {}
+podLabels: {}
+commonLabels: {}
+commonAnnotations: {}
+
 # R14: a dedicated ServiceAccount per app; set create: false and name to reuse
 # an existing one instead.
 serviceAccount:
@@ -96,6 +106,11 @@ service:
       port: 80
       targetPort: 8080
       protocol: TCP
+
+# R39: additional annotations for the Service only, merged with
+# commonAnnotations (serviceAnnotations wins on conflict, being the more
+# specific of the two).
+serviceAnnotations: {}
 
 # R16: rendered into a ConfigMap when non-empty; omitted entirely otherwise.
 config: {}

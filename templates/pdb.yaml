@@ -10,6 +10,10 @@ metadata:
   name: {{ include "generic-app-chart.fullname" . }}
   labels:
     {{- include "generic-app-chart.labels" . | nindent 4 }}
+  {{- with (include "generic-app-chart.annotations" .) }}
+  annotations:
+    {{- nindent 4 . }}
+  {{- end }}
 spec:
   {{- if .Values.pdb.maxUnavailable }}
   maxUnavailable: {{ .Values.pdb.maxUnavailable }}

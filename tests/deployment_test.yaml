@@ -294,3 +294,120 @@ tests:
       - notEqual:
           path: spec.template.metadata.annotations["checksum/config"]
           value: 5dca1b4971fcf24f18b601f3ea7006249acb16174bd63afaf610e21e07b4bccf
+
+  # R39 generic metadata passthrough.
+  - it: adds commonAnnotations to the Deployment's own metadata (R39)
+    template: deployment.yaml
+    set:
+      commonAnnotations:
+        team: platform
+    asserts:
+      - equal:
+          path: metadata.annotations["team"]
+          value: platform
+
+  - it: adds podLabels to the pod template merged with chart-managed pod labels, dropping none (R39)
+    template: deployment.yaml
+    release:
+      name: my-app
+    set:
+      podLabels:
+        tier: backend
+    asserts:
+      - equal:
+          path: spec.template.metadata.labels["tier"]
+          value: backend
+      - equal:
+          path: spec.template.metadata.labels["app.kubernetes.io/name"]
+          value: generic-app-chart
+      - equal:
+          path: spec.template.metadata.labels["app.kubernetes.io/instance"]
+          value: my-app
+
+  # R39 property test: podLabels must never clobber the chart-managed pod
+  # labels that the Deployment's own selector depends on.
+  - it: never lets podLabels override chart-managed pod label keys (R39)
+    template: deployment.yaml
+    release:
+      name: my-app
+    set:
+      podLabels:
+        app.kubernetes.io/name: hijacked
+        app.kubernetes.io/instance: hijacked
+    asserts:
+      - equal:
+          path: spec.template.metadata.labels["app.kubernetes.io/name"]
+          value: generic-app-chart
+      - equal:
+          path: spec.template.metadata.labels["app.kubernetes.io/instance"]
+          value: my-app
+
+  - it: adds podAnnotations to the pod template without dropping the checksum/config annotation (R39, R17)
+    template: deployment.yaml
+    set:
+      config:
+        LOG_LEVEL: debug
+      podAnnotations:
+        vault.hashicorp.com/agent-inject: "true"
+    asserts:
+      - equal:
+          path: spec.template.metadata.annotations["vault.hashicorp.com/agent-inject"]
+          value: "true"
+      - matchRegex:
+          path: spec.template.metadata.annotations["checksum/config"]
+          pattern: "^[0-9a-f]{64}$"
+
+  - it: renders podAnnotations on the pod template even when no config is set (R39)
+    template: deployment.yaml
+    set:
+      podAnnotations:
+        vault.hashicorp.com/agent-inject: "true"
+    asserts:
+      - equal:
+          path: spec.template.metadata.annotations["vault.hashicorp.com/agent-inject"]
+          value: "true"
+      - notExists:
+          path: spec.template.metadata.annotations["checksum/config"]
+
+  # R39 property test: podAnnotations/commonAnnotations must never be able to
+  # override the checksum/config annotation that drives the config-rollout
+  # trigger (R17) — a clobbered checksum would silently stop pods from
+  # restarting on config changes.
+  - it: never lets podAnnotations override the checksum/config annotation (R39, R17)
+    template: deployment.yaml
+    set:
+      config:
+        LOG_LEVEL: debug
+      podAnnotations:
+        checksum/config: hijacked
+    asserts:
+      - matchRegex:
+          path: spec.template.metadata.annotations["checksum/config"]
+          pattern: "^[0-9a-f]{64}$"
+
+  - it: never lets commonAnnotations override the checksum/config annotation (R39, R17)
+    template: deployment.yaml
+    set:
+      config:
+        LOG_LEVEL: debug
+      commonAnnotations:
+        checksum/config: hijacked
+    asserts:
+      - matchRegex:
+          path: spec.template.metadata.annotations["checksum/config"]
+          pattern: "^[0-9a-f]{64}$"
+
+  - it: merges commonAnnotations into the pod template alongside podAnnotations (R39)
+    template: deployment.yaml
+    set:
+      commonAnnotations:
+        team: platform
+      podAnnotations:
+        vault.hashicorp.com/agent-inject: "true"
+    asserts:
+      - equal:
+          path: spec.template.metadata.annotations["team"]
+          value: platform
+      - equal:
+          path: spec.template.metadata.annotations["vault.hashicorp.com/agent-inject"]
+          value: "true"

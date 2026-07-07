@@ -52,3 +52,20 @@ tests:
           value: 2
       - notExists:
           path: spec.minAvailable
+
+  # R39 generic metadata passthrough.
+  - it: adds commonLabels and commonAnnotations to the PDB (R39)
+    set:
+      pdb:
+        enabled: true
+      commonLabels:
+        team: platform
+      commonAnnotations:
+        owner: platform-team
+    asserts:
+      - equal:
+          path: metadata.labels["team"]
+          value: platform
+      - equal:
+          path: metadata.annotations["owner"]
+          value: platform-team

@@ -6,6 +6,10 @@ metadata:
   name: {{ include "generic-app-chart.fullname" . }}
   labels:
     {{- include "generic-app-chart.labels" . | nindent 4 }}
+  {{- with (include "generic-app-chart.annotations" .) }}
+  annotations:
+    {{- nindent 4 . }}
+  {{- end }}
 spec:
   {{- if .Values.persistence.enabled }}
   # R19: persistence forces a single replica — a Longhorn RWO volume can only
@@ -28,14 +32,12 @@ spec:
       {{- include "generic-app-chart.selectorLabels" . | nindent 6 }}
   template:
     metadata:
-      {{- if .Values.config }}
+      {{- with (include "generic-app-chart.podAnnotations" .) }}
       annotations:
-        # R17: forces a rollout when config data changes, since a ConfigMap
-        # update alone does not restart pods that already mounted it.
-        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- nindent 8 . }}
       {{- end }}
       labels:
-        {{- include "generic-app-chart.labels" . | nindent 8 }}
+        {{- include "generic-app-chart.podLabels" . | nindent 8 }}
     spec:
       serviceAccountName: {{ include "generic-app-chart.serviceAccountName" . }}
       automountServiceAccountToken: {{ .Values.automountServiceAccountToken }}

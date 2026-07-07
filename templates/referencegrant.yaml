@@ -18,6 +18,10 @@ metadata:
   namespace: {{ .Release.Namespace }}
   labels:
     {{- include "generic-app-chart.labels" . | nindent 4 }}
+  {{- with (include "generic-app-chart.annotations" .) }}
+  annotations:
+    {{- nindent 4 . }}
+  {{- end }}
 spec:
   from:
     - group: gateway.networking.k8s.io

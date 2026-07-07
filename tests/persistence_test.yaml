@@ -50,6 +50,24 @@ tests:
       - hasDocuments:
           count: 0
 
+  # R39 generic metadata passthrough.
+  - it: adds commonLabels and commonAnnotations to the PVC (R39)
+    template: pvc.yaml
+    set:
+      persistence:
+        enabled: true
+      commonLabels:
+        team: platform
+      commonAnnotations:
+        owner: platform-team
+    asserts:
+      - equal:
+          path: metadata.labels["team"]
+          value: platform
+      - equal:
+          path: metadata.annotations["owner"]
+          value: platform-team
+
   - it: uses a single replica and defaults to the configured replicaCount when persistence is disabled (R19)
     template: deployment.yaml
     set:

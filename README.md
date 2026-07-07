@@ -144,6 +144,22 @@ rendering as normal for in-cluster access.
   namespace/pod-selector; `networkPolicy.additionalEgress` supplies optional
   egress allowances (native `NetworkPolicyEgressRule` entries).
 
+## Generic metadata passthrough
+
+- `podAnnotations`/`podLabels` add to the pod template only, merged with (and
+  never overriding) the chart-managed pod labels/selector labels and the
+  `checksum/config` annotation.
+- `commonLabels`/`commonAnnotations` add to **every** resource this chart
+  renders, merged with (and never overriding) that resource's chart-managed
+  labels/annotations.
+- `serviceAnnotations` adds to the Service only, merged with
+  `commonAnnotations` (`serviceAnnotations` wins on conflict, being the more
+  specific of the two).
+
+Chart-managed keys — selector labels, `helm.sh/chart`, `app.kubernetes.io/*`,
+and the `checksum/config` rollout trigger — always win when a user-supplied
+key collides with one of them.
+
 ## Publishing
 
 Releases are cut by [release-please](https://github.com/googleapis/release-please)
@@ -179,4 +195,4 @@ property/invariant suites). Named scenario values files live under
 - `cluster-only.yaml` — routing disabled, NetworkPolicy enabled (internal,
   locked-down app).
 - `full.yaml` — routing + TLS through a cross-namespace Gateway, autoscaling,
-  PDB, and NetworkPolicy all together.
+  PDB, NetworkPolicy, and generic metadata passthrough all together.

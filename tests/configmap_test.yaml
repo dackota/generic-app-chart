@@ -22,3 +22,20 @@ tests:
     asserts:
       - hasDocuments:
           count: 0
+
+  # R39 generic metadata passthrough.
+  - it: adds commonLabels and commonAnnotations to the ConfigMap (R39)
+    set:
+      config:
+        LOG_LEVEL: debug
+      commonLabels:
+        team: platform
+      commonAnnotations:
+        owner: platform-team
+    asserts:
+      - equal:
+          path: metadata.labels["team"]
+          value: platform
+      - equal:
+          path: metadata.annotations["owner"]
+          value: platform-team

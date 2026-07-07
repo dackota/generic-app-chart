@@ -56,3 +56,37 @@ tests:
       - equal:
           path: spec.selector["app.kubernetes.io/instance"]
           value: my-app
+
+  # R39 generic metadata passthrough.
+  - it: adds serviceAnnotations to the Service (R39)
+    set:
+      serviceAnnotations:
+        external-dns.alpha.kubernetes.io/hostname: my-app.dackota.dev
+    asserts:
+      - equal:
+          path: metadata.annotations["external-dns.alpha.kubernetes.io/hostname"]
+          value: my-app.dackota.dev
+
+  - it: merges commonAnnotations into the Service alongside serviceAnnotations, serviceAnnotations winning on conflict (R39)
+    set:
+      commonAnnotations:
+        team: platform
+        external-dns.alpha.kubernetes.io/hostname: common-value
+      serviceAnnotations:
+        external-dns.alpha.kubernetes.io/hostname: service-specific-value
+    asserts:
+      - equal:
+          path: metadata.annotations["team"]
+          value: platform
+      - equal:
+          path: metadata.annotations["external-dns.alpha.kubernetes.io/hostname"]
+          value: service-specific-value
+
+  - it: adds commonLabels to the Service (R39)
+    set:
+      commonLabels:
+        team: platform
+    asserts:
+      - equal:
+          path: metadata.labels["team"]
+          value: platform

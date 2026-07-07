@@ -154,3 +154,74 @@ tests:
       - hasDocuments:
           count: 0
         template: pvc.yaml
+
+  # R39: the full scenario also carries commonLabels/commonAnnotations,
+  # podAnnotations/podLabels, and serviceAnnotations — proving the generic
+  # metadata passthrough coexists with every other feature the full scenario
+  # exercises (routing/TLS, autoscaling, PDB, NetworkPolicy).
+  - it: propagates commonLabels and commonAnnotations to every rendered resource from the full scenario (R39)
+    release:
+      namespace: ctd
+    values:
+      - ./values/full.yaml
+    asserts:
+      - equal:
+          path: metadata.labels["cost-center"]
+          value: ctd
+        template: deployment.yaml
+      - equal:
+          path: metadata.annotations["owner"]
+          value: platform-team
+        template: deployment.yaml
+      - equal:
+          path: metadata.labels["cost-center"]
+          value: ctd
+        template: service.yaml
+      - equal:
+          path: metadata.labels["cost-center"]
+          value: ctd
+        template: serviceaccount.yaml
+      - equal:
+          path: metadata.labels["cost-center"]
+          value: ctd
+        template: configmap.yaml
+      - equal:
+          path: metadata.labels["cost-center"]
+          value: ctd
+        template: hpa.yaml
+      - equal:
+          path: metadata.labels["cost-center"]
+          value: ctd
+        template: pdb.yaml
+      - equal:
+          path: metadata.labels["cost-center"]
+          value: ctd
+        template: networkpolicy.yaml
+      - equal:
+          path: metadata.labels["cost-center"]
+          value: ctd
+        template: httproute.yaml
+      - equal:
+          path: metadata.labels["cost-center"]
+          value: ctd
+        template: certificate.yaml
+      - equal:
+          path: metadata.labels["cost-center"]
+          value: ctd
+        template: referencegrant.yaml
+      - equal:
+          path: spec.template.metadata.labels["tier"]
+          value: web
+        template: deployment.yaml
+      - equal:
+          path: spec.template.metadata.annotations["vault.hashicorp.com/agent-inject"]
+          value: "true"
+        template: deployment.yaml
+      - matchRegex:
+          path: spec.template.metadata.annotations["checksum/config"]
+          pattern: "^[0-9a-f]{64}$"
+        template: deployment.yaml
+      - equal:
+          path: metadata.annotations["external-dns.alpha.kubernetes.io/hostname"]
+          value: ctd.dackota.dev
+        template: service.yaml

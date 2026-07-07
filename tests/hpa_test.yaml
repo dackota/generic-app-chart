@@ -66,3 +66,20 @@ tests:
             resource:
               name: memory
           any: true
+
+  # R39 generic metadata passthrough.
+  - it: adds commonLabels and commonAnnotations to the HPA (R39)
+    set:
+      autoscaling:
+        enabled: true
+      commonLabels:
+        team: platform
+      commonAnnotations:
+        owner: platform-team
+    asserts:
+      - equal:
+          path: metadata.labels["team"]
+          value: platform
+      - equal:
+          path: metadata.annotations["owner"]
+          value: platform-team

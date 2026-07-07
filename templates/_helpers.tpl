@@ -40,13 +40,19 @@ duplication when the release name already contains it.
 {{- end }}
 
 {{/*
-Standard Helm common labels.
+Standard Helm common labels, merged with .Values.commonLabels (R39) so every
+resource that renders through this shared helper picks up commonLabels
+automatically, without each template bolting the merge on individually.
+Chart-managed keys (helm.sh/chart, the selector labels, version, managed-by)
+always win on conflict — letting commonLabels override
+app.kubernetes.io/name/instance would break the selectors that depend on them
+elsewhere in the chart.
 */}}
 {{- define "generic-app-chart.labels" -}}
-helm.sh/chart: {{ include "generic-app-chart.chart" . }}
-{{ include "generic-app-chart.selectorLabels" . }}
-app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
-app.kubernetes.io/managed-by: {{ .Release.Service }}
+{{- $selector := include "generic-app-chart.selectorLabels" . | fromYaml -}}
+{{- $managed := merge $selector (dict "helm.sh/chart" (include "generic-app-chart.chart" .) "app.kubernetes.io/version" .Chart.AppVersion "app.kubernetes.io/managed-by" .Release.Service) -}}
+{{- $common := .Values.commonLabels | default dict -}}
+{{- mergeOverwrite (deepCopy $common) $managed | toYaml -}}
 {{- end }}
 
 {{/*
