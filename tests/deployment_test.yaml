@@ -1016,6 +1016,18 @@ tests:
           path: spec.template.spec.containers[0].lifecycle.preStop.exec.command
           value: ["/bin/sh", "-c", "sleep 0"]
 
+  # R37 property test: preStop is an optional map (like metrics, R40) and must
+  # never panic the render when a caller explicitly nulls it out — the chart
+  # must fall back to its off-by-default behavior (no lifecycle block) instead
+  # of crashing on `hasKey` against a nil value.
+  - it: never panics and omits the lifecycle block when preStop is explicitly nulled (R37 robustness)
+    template: deployment.yaml
+    set:
+      preStop: null
+    asserts:
+      - notExists:
+          path: spec.template.spec.containers[0].lifecycle
+
   - it: renders a raw lifecycle block verbatim, taking precedence over the sleep shorthand (R37)
     template: deployment.yaml
     set:

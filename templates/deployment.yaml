@@ -59,6 +59,13 @@ these fields are ints or IntOrString percentages, never legitimately "".)
 {{- $maxUnavailableSet := include "generic-app-chart.isSet" $maxUnavailable -}}
 {{- $revisionHistoryLimitSet := include "generic-app-chart.isSet" .Values.revisionHistoryLimit -}}
 {{- $minReadySecondsSet := include "generic-app-chart.isSet" .Values.minReadySeconds -}}
+{{/* R37 robustness: preStop is an optional map (like metrics, R40) — a caller
+can null out the parent key (`--set preStop=null`, `--set-json
+preStop=null`, or a values file with `preStop: null`), which Helm's merge
+turns into a literal nil rather than an empty map. `hasKey` on a nil value
+panics the whole render, so default it to an empty dict once here before any
+key access below. */}}
+{{- $preStop := .Values.preStop | default dict -}}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -208,11 +215,11 @@ spec:
           {{- if .Values.lifecycle }}
           lifecycle:
             {{- toYaml .Values.lifecycle | nindent 12 }}
-          {{- else if hasKey .Values.preStop "sleepSeconds" }}
+          {{- else if hasKey $preStop "sleepSeconds" }}
           lifecycle:
             preStop:
               exec:
-                command: ["/bin/sh", "-c", "sleep {{ .Values.preStop.sleepSeconds }}"]
+                command: ["/bin/sh", "-c", "sleep {{ $preStop.sleepSeconds }}"]
           {{- end }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
