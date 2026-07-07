@@ -4,20 +4,65 @@ name: release-please
 # Chart.yaml's version (release-type: helm) per release-please-config.json.
 # Merging that PR tags the release, which triggers .github/workflows/release.yml
 # to publish the chart to GHCR.
+#
+# Both release-please-action and the merge step below authenticate as the
+# dk-renovate-bot GitHub App, not GITHUB_TOKEN, because GitHub does not let
+# actions performed by the default GITHUB_TOKEN trigger further workflow
+# runs (its anti-recursion rule): a GITHUB_TOKEN-authored merge-to-main push
+# would not re-trigger this `on: push` workflow, so release-please-action
+# would never get a chance to notice the release PR was merged and cut the
+# tag + GitHub Release that release.yml listens for.
 on:
   push:
     branches:
       - main
 
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
 
 jobs:
   release-please:
     runs-on: ubuntu-latest
     steps:
-      - uses: googleapis/release-please-action@v4
+      - name: Generate a token for the dk-renovate-bot App
+        id: app-token
+        uses: actions/create-github-app-token@v3
         with:
+          app-id: ${{ secrets.CI_APP_ID }}
+          private-key: ${{ secrets.CI_APP_PRIVATE_KEY }}
+
+      - name: Run release-please
+        id: release
+        uses: googleapis/release-please-action@v4
+        with:
+          token: ${{ steps.app-token.outputs.token }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+
+      # This repo has no required CI checks on the release PR, so unlike a
+      # setup that waits for pr-ci.yml/pr-title-lint.yml to go green, merge
+      # as soon as release-please has created or updated it this run.
+      # `steps.release.outputs.prs` is a JSON array of PullRequest objects
+      # (unset/"[]" when nothing changed this run).
+      - name: Auto-merge release PR(s)
+        if: steps.release.outputs.prs_created == 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          PRS_JSON: ${{ steps.release.outputs.prs }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "$PRS_JSON" ] || [ "$PRS_JSON" = "[]" ]; then
+            echo "No release PRs created or updated this run; nothing to merge."
+            exit 0
+          fi
+
+          echo "$PRS_JSON" | jq -c '.[]' | while read -r pr; do
+            number=$(echo "$pr" | jq -r '.number')
+            title=$(echo "$pr" | jq -r '.title')
+            echo "::group::release PR #$number -- $title"
+            if ! gh pr merge "$number" --repo "$GITHUB_REPOSITORY" --squash --delete-branch; then
+              echo "::error::merge failed for release PR #$number"
+            fi
+            echo "::endgroup::"
+          done
