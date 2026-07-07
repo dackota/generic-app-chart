@@ -39,6 +39,7 @@ spec:
     spec:
       serviceAccountName: {{ include "generic-app-chart.serviceAccountName" . }}
       automountServiceAccountToken: {{ .Values.automountServiceAccountToken }}
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
       securityContext:
         {{- include "generic-app-chart.podSecurityContext" . | nindent 8 }}
       containers:
@@ -82,6 +83,15 @@ spec:
           {{- with .Values.startupProbe }}
           startupProbe:
             {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- if .Values.lifecycle }}
+          lifecycle:
+            {{- toYaml .Values.lifecycle | nindent 12 }}
+          {{- else if .Values.preStop.sleepSeconds }}
+          lifecycle:
+            preStop:
+              exec:
+                command: ["/bin/sh", "-c", "sleep {{ .Values.preStop.sleepSeconds }}"]
           {{- end }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}

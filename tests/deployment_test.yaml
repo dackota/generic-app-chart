@@ -294,3 +294,55 @@ tests:
       - notEqual:
           path: spec.template.metadata.annotations["checksum/config"]
           value: 5dca1b4971fcf24f18b601f3ea7006249acb16174bd63afaf610e21e07b4bccf
+
+  - it: defaults terminationGracePeriodSeconds to 30 on the pod spec (R37)
+    template: deployment.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.terminationGracePeriodSeconds
+          value: 30
+
+  - it: renders an overridden terminationGracePeriodSeconds on the pod spec (R37)
+    template: deployment.yaml
+    set:
+      terminationGracePeriodSeconds: 90
+    asserts:
+      - equal:
+          path: spec.template.spec.terminationGracePeriodSeconds
+          value: 90
+
+  - it: omits the lifecycle block when no preStop is configured (R37)
+    template: deployment.yaml
+    asserts:
+      - notExists:
+          path: spec.template.spec.containers[0].lifecycle
+
+  - it: renders a preStop sleep-drain shorthand as a container lifecycle exec sleep (R37)
+    template: deployment.yaml
+    set:
+      preStop:
+        sleepSeconds: 5
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].lifecycle.preStop.exec.command
+          value: ["/bin/sh", "-c", "sleep 5"]
+
+  - it: renders a raw lifecycle block verbatim, taking precedence over the sleep shorthand (R37)
+    template: deployment.yaml
+    set:
+      preStop:
+        sleepSeconds: 5
+      lifecycle:
+        preStop:
+          exec:
+            command: ["/bin/sh", "-c", "sleep 15 && custom-cleanup.sh"]
+        postStart:
+          exec:
+            command: ["/bin/sh", "-c", "echo starting"]
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].lifecycle.preStop.exec.command
+          value: ["/bin/sh", "-c", "sleep 15 && custom-cleanup.sh"]
+      - equal:
+          path: spec.template.spec.containers[0].lifecycle.postStart.exec.command
+          value: ["/bin/sh", "-c", "echo starting"]
