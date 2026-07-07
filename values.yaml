@@ -57,6 +57,29 @@ replicaCount: 1
 # R13: no pod automatically mounts its ServiceAccount token unless opted in.
 automountServiceAccountToken: false
 
+# R37: seconds Kubernetes waits after sending SIGTERM before force-killing the
+# pod; override for apps that need longer (or shorter) to drain in-flight
+# work before exit.
+terminationGracePeriodSeconds: 30
+
+# R37: sleep-drain shorthand — set `preStop.sleepSeconds` to render a
+# container lifecycle.preStop exec `sleep <n>` hook, giving in-flight
+# connections time to drain before SIGTERM is sent. Ignored whenever
+# `lifecycle` below is set.
+preStop: {}
+#   preStop:
+#     sleepSeconds: 5
+
+# R37: raw Lifecycle passthrough — rendered verbatim exactly as the
+# Kubernetes container Lifecycle spec (preStop/postStart), taking precedence
+# over preStop.sleepSeconds above. No `lifecycle` block is rendered on the
+# container when neither this nor preStop.sleepSeconds is set.
+#   lifecycle:
+#     preStop:
+#       exec:
+#         command: ["/bin/sh", "-c", "sleep 5 && custom-cleanup.sh"]
+lifecycle: {}
+
 # R9: pod-level strict security defaults (_security.tpl). Every field below
 # is independently overridable (R12) — set only the field you need to change,
 # the rest keep their restricted-PSA-compliant default.
