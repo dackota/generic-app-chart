@@ -1,5 +1,14 @@
 {{- $volumeMounts := include "generic-app-chart.volumeMounts" . -}}
 {{- $volumes := include "generic-app-chart.volumes" . -}}
+{{/* R36: the primary service port backs the readiness default and any
+port-less probe shorthand — see templates/_probes.tpl. */}}
+{{- $primaryPort := "" -}}
+{{- if .Values.service.ports -}}
+{{- $primaryPort = (first .Values.service.ports).targetPort -}}
+{{- end -}}
+{{- $livenessProbe := include "generic-app-chart.probe" (dict "value" .Values.livenessProbe "port" $primaryPort "default" false "name" "livenessProbe") -}}
+{{- $readinessProbe := include "generic-app-chart.probe" (dict "value" .Values.readinessProbe "port" $primaryPort "default" true "name" "readinessProbe") -}}
+{{- $startupProbe := include "generic-app-chart.probe" (dict "value" .Values.startupProbe "port" $primaryPort "default" false "name" "startupProbe") -}}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -78,17 +87,17 @@ spec:
           envFrom:
             {{- toYaml . | nindent 12 }}
           {{- end }}
-          {{- with .Values.livenessProbe }}
+          {{- with $livenessProbe }}
           livenessProbe:
-            {{- toYaml . | nindent 12 }}
+            {{- nindent 12 . }}
           {{- end }}
-          {{- with .Values.readinessProbe }}
+          {{- with $readinessProbe }}
           readinessProbe:
-            {{- toYaml . | nindent 12 }}
+            {{- nindent 12 . }}
           {{- end }}
-          {{- with .Values.startupProbe }}
+          {{- with $startupProbe }}
           startupProbe:
-            {{- toYaml . | nindent 12 }}
+            {{- nindent 12 . }}
           {{- end }}
           {{- if .Values.lifecycle }}
           lifecycle:

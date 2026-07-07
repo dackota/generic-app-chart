@@ -43,7 +43,11 @@ dependency in its own thin `Chart.yaml` plus a `values.yaml` — see the
   `extraVolumeMounts` accept arbitrary native Volume/VolumeMount shapes (e.g. a
   referenced Secret or ConfigMap volume), assembled through the same
   `_volumes.tpl` partial as the automatic `/tmp` emptyDir, `extraEmptyDirs`,
-  and the persistence PVC — all of them coexist.
+  and the persistence PVC — all of them coexist. `livenessProbe`/
+  `readinessProbe`/`startupProbe` each accept a raw native Probe block, a
+  `{path, port}`/`{port}` shorthand, or (readiness only) fall back to a
+  `tcpSocket` check on the primary service port when left unset — see the
+  comments in `values.yaml`.
 - **Service** (`templates/service.yaml`) — `ClusterIP` by default (overridable
   via `service.type`), mapping `service.ports` onto the pod's container ports.
 - **ServiceAccount** (`templates/serviceaccount.yaml`) — a dedicated SA per
