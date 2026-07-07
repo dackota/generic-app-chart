@@ -2,14 +2,9 @@
 
 A reusable, security-hardened Helm chart for deploying personal applications on a
 home-lab Kubernetes cluster. Renders a complete app — Deployment, Service,
-ServiceAccount, ConfigMap, and optional persistence — from a single
+ServiceAccount, ConfigMap, optional persistence, Gateway API routing +
+cert-manager TLS, and opt-in HPA/PDB/NetworkPolicy — from a single
 `values.yaml`, with restricted-PSA security defaults applied out of the box.
-
-Routing (Gateway API HTTPRoute + cert-manager Certificate + ReferenceGrant),
-HPA, PDB, and NetworkPolicy are built on top of this chart by the
-`networking-operational-addons` task; this chart's structure deliberately
-leaves room for them (e.g. an `hpa.yaml`/`networkpolicy.yaml`/`httproute.yaml`
-template can be added later without reshaping what's here).
 
 Published to `oci://ghcr.io/dackota/charts/generic-app-chart`.
 
@@ -18,15 +13,14 @@ Published to `oci://ghcr.io/dackota/charts/generic-app-chart`.
 This chart declares `kubeVersion: ">=1.27.0-0"` in `Chart.yaml`.
 
 The cluster capabilities below are prerequisites for the **whole app surface**
-this chart renders across all of its tasks — not all of them are exercised by
-what's implemented so far:
+this chart renders:
 
 | Capability | Used by | Status in this chart |
 |---|---|---|
 | **Longhorn** (`storageClass: longhorn`) | `persistence.enabled` PVC (`templates/pvc.yaml`) | Implemented |
-| **metrics-server** | HPA target metrics | Not yet rendered — lands with `networking-operational-addons` |
-| **Gateway API** (Traefik as the implementation) | HTTPRoute | Not yet rendered — lands with `networking-operational-addons` |
-| **cert-manager** + a `letsencrypt` ClusterIssuer | Certificate | Not yet rendered — lands with `networking-operational-addons` |
+| **metrics-server** | HPA target metrics (`templates/hpa.yaml`) | Implemented |
+| **Gateway API** (Traefik as the implementation) | HTTPRoute, ReferenceGrant | Implemented |
+| **cert-manager** + a `letsencrypt` ClusterIssuer | Certificate | Implemented |
 
 ## Installing
 
@@ -53,6 +47,26 @@ dependency in its own thin `Chart.yaml` plus a `values.yaml` — see the
 - **PersistentVolumeClaim** (`templates/pvc.yaml`) — an RWO Longhorn volume,
   rendered only when `persistence.enabled` and no `persistence.existingClaim`
   is supplied.
+- **HTTPRoute** (`templates/httproute.yaml`) — a Gateway API route to this
+  chart's Service, rendered only when `routing.enabled`; parentRef
+  name/namespace/sectionName target the lab's one shared Gateway.
+- **Certificate** (`templates/certificate.yaml`) — a cert-manager Certificate
+  for `routing.hostnames`, rendered when `routing.enabled` and
+  `routing.tls.enabled` (on by default), issued via the `letsencrypt`
+  ClusterIssuer by default.
+- **ReferenceGrant** (`templates/referencegrant.yaml`) — authorizes the
+  Gateway's namespace to reach this namespace's Service/Secret, rendered only
+  when routing is enabled and the Gateway lives in a different namespace than
+  this release; omitted entirely when they match.
+- **HorizontalPodAutoscaler** (`templates/hpa.yaml`) — rendered when
+  `autoscaling.enabled`, unless `persistence.enabled` (the two are mutually
+  exclusive by construction — see "Persistence" below).
+- **PodDisruptionBudget** (`templates/pdb.yaml`) — rendered when `pdb.enabled`,
+  using `minAvailable` by default or `maxUnavailable` when set (mutually
+  exclusive).
+- **NetworkPolicy** (`templates/networkpolicy.yaml`) — rendered when
+  `networkPolicy.enabled`; default-deny ingress except from the configured
+  gateway namespace/pods, with optional additional egress allowances.
 
 This chart never renders a Secret resource. It consumes existing in-cluster
 Secrets only, via `envFrom.secretRef` / `env[].valueFrom.secretKeyRef` — see
@@ -83,8 +97,38 @@ Set `persistence.enabled: true` to get an RWO Longhorn PVC mounted at
 `persistence.mountPath`. Enabling persistence forces the Deployment to
 `strategy: Recreate` and pins `replicas: 1` — a Longhorn RWO volume can only
 be attached to one pod at a time, so persistence and autoscaling are mutually
-exclusive by construction (the HPA template the `networking-operational-addons`
-task adds must gate on `persistence.enabled` the same way).
+exclusive by construction: `templates/hpa.yaml` never renders while
+`persistence.enabled` is true, regardless of `autoscaling.enabled`.
+
+## Routing, TLS, and cluster-only mode
+
+Set `routing.enabled: true` to expose the app through the lab's one shared
+Traefik Gateway: an `HTTPRoute` is rendered with `routing.hostnames`, a
+`parentRef` to `routing.gateway.{name,namespace,sectionName}`, and a
+`backendRef` to this chart's Service. TLS is issued automatically
+(`routing.tls.enabled: true` by default) via a cert-manager `Certificate`
+against the `letsencrypt` `ClusterIssuer`, targeting `routing.tls.secretName`
+(defaults to `<fullname>-tls`). When the Gateway's namespace differs from the
+release namespace, a `ReferenceGrant` is rendered automatically authorizing
+that namespace to reach this namespace's Service and Secret; it is omitted
+when they're the same namespace.
+
+Leaving `routing.enabled: false` (the default) is cluster-only mode: no
+HTTPRoute/Certificate/ReferenceGrant renders, while the Service keeps
+rendering as normal for in-cluster access.
+
+## Autoscaling, PodDisruptionBudget, and NetworkPolicy
+
+- `autoscaling.enabled: true` renders an HPA (`minReplicas`/`maxReplicas`,
+  CPU/memory target utilization); the Deployment's static `replicas` is
+  omitted once the HPA owns replica count. Mutually exclusive with
+  `persistence.enabled` (see above).
+- `pdb.enabled: true` renders a PodDisruptionBudget using `minAvailable`
+  (default `1`) or `maxUnavailable` when set.
+- `networkPolicy.enabled: true` renders a default-deny-ingress NetworkPolicy
+  that allows only the configured `networkPolicy.gateway`
+  namespace/pod-selector; `networkPolicy.additionalEgress` supplies optional
+  egress allowances (native `NetworkPolicyEgressRule` entries).
 
 ## Publishing
 
@@ -109,12 +153,16 @@ helm unittest .
 
 Suites live under `tests/*_test.yaml` (one per module: naming/labels,
 security defaults, workload, persistence, config, service, serviceaccount,
-plus the R28 and R12 property/invariant suites). Named scenario values files
-live under `tests/values/`:
+HTTPRoute, Certificate, ReferenceGrant, HPA, PDB, NetworkPolicy, plus the R28
+secret, R12 security opt-out, R24 cluster-only, and R25 HPA<->persistence
+property/invariant suites). Named scenario values files live under
+`tests/values/`:
 
 - `default.yaml` — minimal/base case (stateless app).
 - `persistent.yaml` — persistence enabled (stateful app).
-
-(`autoscaling.yaml`, `networkpolicy.yaml`, `cluster-only.yaml`, and
-`full.yaml` are added by the `networking-operational-addons` task alongside
-the features they exercise.)
+- `autoscaling.yaml` — HPA enabled (stateless, scaling app).
+- `networkpolicy.yaml` — default-deny NetworkPolicy enabled.
+- `cluster-only.yaml` — routing disabled, NetworkPolicy enabled (internal,
+  locked-down app).
+- `full.yaml` — routing + TLS through a cross-namespace Gateway, autoscaling,
+  PDB, and NetworkPolicy all together.

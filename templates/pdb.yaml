@@ -1,0 +1,22 @@
+{{/*
+M8 scaling & disruption — R26. minAvailable/maxUnavailable are mutually
+exclusive on a PodDisruptionBudget spec — maxUnavailable wins when the caller
+sets it, otherwise minAvailable (which defaults on) applies.
+*/}}
+{{- if .Values.pdb.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "generic-app-chart.fullname" . }}
+  labels:
+    {{- include "generic-app-chart.labels" . | nindent 4 }}
+spec:
+  {{- if .Values.pdb.maxUnavailable }}
+  maxUnavailable: {{ .Values.pdb.maxUnavailable }}
+  {{- else }}
+  minAvailable: {{ .Values.pdb.minAvailable }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "generic-app-chart.selectorLabels" . | nindent 6 }}
+{{- end }}

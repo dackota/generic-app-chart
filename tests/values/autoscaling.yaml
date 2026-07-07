@@ -1,0 +1,20 @@
+# R31 scenario: autoscaling enabled — a stateless app that scales with load.
+# Persistence stays disabled (default) since the two are mutually exclusive
+# (R20/R25); exercises the HPA path and the Deployment's static-replicas
+# omission.
+image:
+  repository: ghcr.io/dackota/podinfo
+  tag: "6.5.0"
+
+service:
+  ports:
+    - name: http
+      port: 80
+      targetPort: 9898
+      protocol: TCP
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 6
+  targetCPUUtilizationPercentage: 75

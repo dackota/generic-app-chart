@@ -1,0 +1,63 @@
+# M5 networking — Certificate (certificate.yaml) — R22, R24.
+suite: generic-app-chart Certificate (M5)
+templates:
+  - certificate.yaml
+tests:
+  - it: renders no Certificate when routing is disabled (R24)
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders no Certificate when routing is enabled but TLS is disabled
+    set:
+      routing:
+        enabled: true
+        hostnames: ["my-app.dackota.dev"]
+        tls:
+          enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders a Certificate with dnsNames from the route hosts, a letsencrypt ClusterIssuer, and a target secretName (R22)
+    release:
+      name: my-app
+    set:
+      routing:
+        enabled: true
+        hostnames: ["my-app.dackota.dev", "alt.dackota.dev"]
+    asserts:
+      - isKind:
+          of: Certificate
+      - isAPIVersion:
+          of: cert-manager.io/v1
+      - equal:
+          path: spec.dnsNames
+          value: ["my-app.dackota.dev", "alt.dackota.dev"]
+      - equal:
+          path: spec.issuerRef
+          value:
+            name: letsencrypt
+            kind: ClusterIssuer
+      - equal:
+          path: spec.secretName
+          value: my-app-generic-app-chart-tls
+
+  - it: honors an explicit secretName and issuerRef override (R22)
+    set:
+      routing:
+        enabled: true
+        hostnames: ["my-app.dackota.dev"]
+        tls:
+          enabled: true
+          secretName: custom-tls-secret
+          issuerRef:
+            name: custom-issuer
+            kind: ClusterIssuer
+    asserts:
+      - equal:
+          path: spec.secretName
+          value: custom-tls-secret
+      - equal:
+          path: spec.issuerRef.name
+          value: custom-issuer

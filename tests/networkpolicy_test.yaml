@@ -1,0 +1,79 @@
+# M9 networkpolicy (networkpolicy.yaml) — R27.
+suite: generic-app-chart NetworkPolicy (M9)
+templates:
+  - networkpolicy.yaml
+tests:
+  - it: renders no NetworkPolicy when disabled
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders a default-deny-ingress NetworkPolicy scoped to this app's pods, allowing only the configured gateway namespace, when enabled (R27)
+    release:
+      name: my-app
+    set:
+      networkPolicy:
+        enabled: true
+    asserts:
+      - isKind:
+          of: NetworkPolicy
+      - equal:
+          path: spec.podSelector.matchLabels["app.kubernetes.io/name"]
+          value: generic-app-chart
+      - equal:
+          path: spec.podSelector.matchLabels["app.kubernetes.io/instance"]
+          value: my-app
+      - contains:
+          path: spec.policyTypes
+          content: Ingress
+      - notContains:
+          path: spec.policyTypes
+          content: Egress
+          any: true
+      - equal:
+          path: spec.ingress[0].from[0].namespaceSelector.matchLabels["kubernetes.io/metadata.name"]
+          value: traefik
+      - notExists:
+          path: spec.egress
+
+  - it: honors a custom gateway namespaceSelector and podSelector (R27)
+    set:
+      networkPolicy:
+        enabled: true
+        gateway:
+          namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: custom-gateway-ns
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: traefik
+    asserts:
+      - equal:
+          path: spec.ingress[0].from[0].namespaceSelector.matchLabels["kubernetes.io/metadata.name"]
+          value: custom-gateway-ns
+      - equal:
+          path: spec.ingress[0].from[0].podSelector.matchLabels["app.kubernetes.io/name"]
+          value: traefik
+
+  - it: adds Egress to policyTypes and renders the configured egress rules when additionalEgress is set (R27)
+    set:
+      networkPolicy:
+        enabled: true
+        additionalEgress:
+          - to:
+              - namespaceSelector: {}
+            ports:
+              - protocol: UDP
+                port: 53
+    asserts:
+      - contains:
+          path: spec.policyTypes
+          content: Egress
+      - equal:
+          path: spec.egress
+          value:
+            - to:
+                - namespaceSelector: {}
+              ports:
+                - protocol: UDP
+                  port: 53

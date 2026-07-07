@@ -112,3 +112,71 @@ persistence:
   storageClass: longhorn
   mountPath: /data
   existingClaim: ""
+
+# R21/R22/R23: cluster-only by default (routing.enabled: false) — no
+# HTTPRoute/Certificate/ReferenceGrant renders until routing is turned on (see
+# R24). When enabled, the chart exposes this app's Service through the lab's
+# one shared Traefik Gateway and issues it a letsencrypt certificate.
+routing:
+  enabled: false
+  # Hostname(s) the HTTPRoute matches and the Certificate's dnsNames are
+  # derived from.
+  hostnames: []
+  # R21: parentRef to the shared Gateway — name/namespace/sectionName are all
+  # overridable per app; there is exactly one Gateway on this lab.
+  gateway:
+    name: shared-gateway
+    # Defaults to this release's namespace when unset (R23 default case).
+    namespace: ""
+    # Optional; omitted from the parentRef when unset (matches any listener).
+    sectionName: ""
+  # R22: TLS is on by default whenever routing is enabled — opt out per app if
+  # a route genuinely needs to stay HTTP-only.
+  tls:
+    enabled: true
+    issuerRef:
+      name: letsencrypt
+      kind: ClusterIssuer
+    # Defaults to "<fullname>-tls" when unset.
+    secretName: ""
+
+# R25: opt-in HPA. Mutually exclusive with persistence.enabled — a Longhorn
+# RWO volume can only be attached to one pod, so the chart suppresses the HPA
+# (and keeps the Deployment's static replicas) whenever persistence is on,
+# regardless of this flag (see deployment.yaml/hpa.yaml).
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 80
+  # Omitted from the HPA's metrics when unset.
+  targetMemoryUtilizationPercentage: ""
+
+# R26: opt-in PDB. minAvailable/maxUnavailable are mutually exclusive; set
+# maxUnavailable to use it instead of the default minAvailable.
+pdb:
+  enabled: false
+  minAvailable: 1
+  maxUnavailable: ""
+
+# R27: opt-in default-deny-ingress NetworkPolicy. When enabled, only the
+# configured gateway namespace/pods may reach this app; everything else is
+# denied by default. Egress stays unrestricted unless additionalEgress rules
+# are supplied.
+networkPolicy:
+  enabled: false
+  gateway:
+    namespaceSelector:
+      matchLabels:
+        kubernetes.io/metadata.name: traefik
+    # Optional; narrows the allow rule to specific pods within the gateway
+    # namespace when set.
+    podSelector: {}
+  # Native NetworkPolicyEgressRule entries, e.g. to allow DNS or an external API:
+  #   additionalEgress:
+  #     - to:
+  #         - namespaceSelector: {}
+  #       ports:
+  #         - protocol: UDP
+  #           port: 53
+  additionalEgress: []

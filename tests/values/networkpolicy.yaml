@@ -1,0 +1,20 @@
+# R31 scenario: NetworkPolicy enabled — a security-conscious app that is
+# network-isolated by default, reachable only from the shared Traefik Gateway
+# namespace.
+image:
+  repository: ghcr.io/dackota/podinfo
+  tag: "6.5.0"
+
+service:
+  ports:
+    - name: http
+      port: 80
+      targetPort: 9898
+      protocol: TCP
+
+networkPolicy:
+  enabled: true
+  gateway:
+    namespaceSelector:
+      matchLabels:
+        kubernetes.io/metadata.name: traefik

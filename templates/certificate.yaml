@@ -1,0 +1,19 @@
+{{/*
+M5 networking — R22. Issues TLS for the route's hostname(s) via cert-manager;
+suppressed when routing is disabled (R24) or TLS is opted out per app.
+*/}}
+{{- if and .Values.routing.enabled .Values.routing.tls.enabled }}
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ include "generic-app-chart.fullname" . }}
+  labels:
+    {{- include "generic-app-chart.labels" . | nindent 4 }}
+spec:
+  secretName: {{ .Values.routing.tls.secretName | default (printf "%s-tls" (include "generic-app-chart.fullname" .)) }}
+  dnsNames:
+    {{- toYaml .Values.routing.hostnames | nindent 4 }}
+  issuerRef:
+    name: {{ .Values.routing.tls.issuerRef.name }}
+    kind: {{ .Values.routing.tls.issuerRef.kind }}
+{{- end }}

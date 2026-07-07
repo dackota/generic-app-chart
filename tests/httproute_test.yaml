@@ -1,0 +1,62 @@
+# M5 networking — HTTPRoute (httproute.yaml) — R21, R24.
+suite: generic-app-chart HTTPRoute (M5)
+templates:
+  - httproute.yaml
+tests:
+  - it: renders no HTTPRoute when routing is disabled (R24)
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders an HTTPRoute with hostnames, parentRef, rules/matches, and a backendRef to the Service (R21)
+    release:
+      name: my-app
+    set:
+      routing:
+        enabled: true
+        hostnames: ["my-app.dackota.dev"]
+        gateway:
+          name: shared-gateway
+          namespace: traefik
+          sectionName: https
+    asserts:
+      - isKind:
+          of: HTTPRoute
+      - isAPIVersion:
+          of: gateway.networking.k8s.io/v1
+      - equal:
+          path: metadata.name
+          value: my-app-generic-app-chart
+      - equal:
+          path: spec.hostnames
+          value: ["my-app.dackota.dev"]
+      - equal:
+          path: spec.parentRefs
+          value:
+            - name: shared-gateway
+              namespace: traefik
+              sectionName: https
+      - contains:
+          path: spec.rules[0].backendRefs
+          content:
+            name: my-app-generic-app-chart
+            port: 80
+      - isNotEmpty:
+          path: spec.rules[0].matches
+
+  - it: omits sectionName from the parentRef when unset and defaults the Gateway namespace to the release namespace (R21, R23)
+    release:
+      name: my-app
+      namespace: my-app-ns
+    set:
+      routing:
+        enabled: true
+        hostnames: ["my-app.dackota.dev"]
+        gateway:
+          name: shared-gateway
+    asserts:
+      - equal:
+          path: spec.parentRefs
+          value:
+            - name: shared-gateway
+              namespace: my-app-ns

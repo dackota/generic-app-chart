@@ -7,9 +7,16 @@ metadata:
   labels:
     {{- include "generic-app-chart.labels" . | nindent 4 }}
 spec:
+  {{- if .Values.persistence.enabled }}
   # R19: persistence forces a single replica — a Longhorn RWO volume can only
   # be attached to one pod at a time, so a rolling update would deadlock.
-  replicas: {{ if .Values.persistence.enabled }}1{{ else }}{{ .Values.replicaCount }}{{ end }}
+  replicas: 1
+  {{- else if .Values.autoscaling.enabled }}
+  # R25: omitted — the HPA (hpa.yaml) owns replica count once autoscaling is
+  # active; setting a static value here would fight the HPA on every sync.
+  {{- else }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
   {{- if .Values.persistence.enabled }}
   # R19: Recreate (not RollingUpdate) so the old pod detaches the RWO volume
   # before the new one attaches it.

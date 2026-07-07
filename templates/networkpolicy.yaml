@@ -1,0 +1,35 @@
+{{/*
+M9 networkpolicy — R27. Default-deny-ingress: only the configured gateway
+namespace/pods may reach this app; every other ingress source is denied by
+omission. Egress stays unrestricted (no Egress policyType) unless the caller
+supplies additionalEgress rules.
+*/}}
+{{- if .Values.networkPolicy.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "generic-app-chart.fullname" . }}
+  labels:
+    {{- include "generic-app-chart.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "generic-app-chart.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Ingress
+    {{- if .Values.networkPolicy.additionalEgress }}
+    - Egress
+    {{- end }}
+  ingress:
+    - from:
+        - namespaceSelector:
+            {{- toYaml .Values.networkPolicy.gateway.namespaceSelector | nindent 12 }}
+          {{- with .Values.networkPolicy.gateway.podSelector }}
+          podSelector:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+  {{- with .Values.networkPolicy.additionalEgress }}
+  egress:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+{{- end }}

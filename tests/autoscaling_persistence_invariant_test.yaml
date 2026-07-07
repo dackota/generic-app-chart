@@ -1,0 +1,66 @@
+# R25/R20 property test: HPA<->persistence mutual exclusion is a chart
+# invariant, not a caller responsibility. Across every combination of
+# autoscaling.enabled and persistence.enabled, the HPA must render if and only
+# if autoscaling.enabled && !persistence.enabled, and the Deployment's static
+# replicas must be present if and only if the HPA is absent. helm-unittest has
+# no generative-testing primitive, so this is a tight table covering all 4
+# combinations rather than a single generated property.
+suite: generic-app-chart HPA<->persistence mutual exclusion (R25)
+templates:
+  - hpa.yaml
+  - deployment.yaml
+tests:
+  - it: autoscaling off, persistence off -> no HPA, static replicas present
+    set:
+      replicaCount: 4
+    asserts:
+      - hasDocuments:
+          count: 0
+        template: hpa.yaml
+      - equal:
+          path: spec.replicas
+          value: 4
+        template: deployment.yaml
+
+  - it: autoscaling on, persistence off -> HPA present, static replicas absent
+    set:
+      autoscaling:
+        enabled: true
+      replicaCount: 4
+    asserts:
+      - hasDocuments:
+          count: 1
+        template: hpa.yaml
+      - notExists:
+          path: spec.replicas
+        template: deployment.yaml
+
+  - it: autoscaling off, persistence on -> no HPA, static replicas present (pinned to 1)
+    set:
+      persistence:
+        enabled: true
+      replicaCount: 4
+    asserts:
+      - hasDocuments:
+          count: 0
+        template: hpa.yaml
+      - equal:
+          path: spec.replicas
+          value: 1
+        template: deployment.yaml
+
+  - it: autoscaling on, persistence on -> persistence wins, no HPA, static replicas present (pinned to 1)
+    set:
+      autoscaling:
+        enabled: true
+      persistence:
+        enabled: true
+      replicaCount: 4
+    asserts:
+      - hasDocuments:
+          count: 0
+        template: hpa.yaml
+      - equal:
+          path: spec.replicas
+          value: 1
+        template: deployment.yaml

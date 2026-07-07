@@ -1,0 +1,21 @@
+# R31 scenario: cluster-only mode (R24) — an internal service reachable only
+# from inside the cluster. routing.enabled is explicitly false (the chart
+# default) so no HTTPRoute/Certificate/ReferenceGrant renders, paired with
+# NetworkPolicy so the app is also network-isolated from everything except the
+# gateway namespace — the two features combine for "internal and locked down".
+image:
+  repository: ghcr.io/dackota/podinfo
+  tag: "6.5.0"
+
+service:
+  ports:
+    - name: http
+      port: 80
+      targetPort: 9898
+      protocol: TCP
+
+routing:
+  enabled: false
+
+networkPolicy:
+  enabled: true
