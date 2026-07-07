@@ -1,5 +1,5 @@
-# M8 scaling & disruption — HorizontalPodAutoscaler (hpa.yaml) — R25.
-suite: generic-app-chart HorizontalPodAutoscaler (M8)
+# Scaling & disruption — HorizontalPodAutoscaler (hpa.yaml).
+suite: generic-app-chart HorizontalPodAutoscaler
 templates:
   - hpa.yaml
 tests:
@@ -8,7 +8,7 @@ tests:
       - hasDocuments:
           count: 0
 
-  - it: renders an HPA with minReplicas/maxReplicas and CPU/memory targets when autoscaling is enabled (R25)
+  - it: renders an HPA with minReplicas/maxReplicas and CPU/memory targets when autoscaling is enabled
     release:
       name: my-app
     set:
@@ -66,3 +66,20 @@ tests:
             resource:
               name: memory
           any: true
+
+  # Generic metadata passthrough.
+  - it: adds commonLabels and commonAnnotations to the HPA
+    set:
+      autoscaling:
+        enabled: true
+      commonLabels:
+        team: platform
+      commonAnnotations:
+        owner: platform-team
+    asserts:
+      - equal:
+          path: metadata.labels["team"]
+          value: platform
+      - equal:
+          path: metadata.annotations["owner"]
+          value: platform-team

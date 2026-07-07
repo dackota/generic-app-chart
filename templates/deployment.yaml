@@ -1,46 +1,177 @@
 {{- $volumeMounts := include "generic-app-chart.volumeMounts" . -}}
 {{- $volumes := include "generic-app-chart.volumes" . -}}
+{{/* The primary service port backs the readiness default and any
+port-less probe shorthand — see templates/_probes.tpl. */}}
+{{- $primaryPort := "" -}}
+{{- if .Values.service.ports -}}
+{{- $primaryPort = (first .Values.service.ports).targetPort -}}
+{{- end -}}
+{{- $livenessProbe := include "generic-app-chart.probe" (dict "value" .Values.livenessProbe "port" $primaryPort "default" false "name" "livenessProbe") -}}
+{{- $readinessProbe := include "generic-app-chart.probe" (dict "value" .Values.readinessProbe "port" $primaryPort "default" true "name" "readinessProbe") -}}
+{{- $startupProbe := include "generic-app-chart.probe" (dict "value" .Values.startupProbe "port" $primaryPort "default" false "name" "startupProbe") -}}
+{{/*
+"Presence and non-nil" (not truthiness, not string-emptiness) checks —
+an explicit 0 must still render; unset AND an explicit `null` override must
+both be omitted. See generic-app-chart.isSet (_values.tpl) for why.
+
+updateStrategy.maxSurge/maxUnavailable are read through `dig`, never through a
+direct `.Values.updateStrategy.maxSurge` chain: `updateStrategy` is itself an
+optional map, and a caller can null out the PARENT (`--set
+updateStrategy=null`, `--set-json updateStrategy=null`, or a values file with
+`updateStrategy: null` — all three verified empirically to behave the same
+way below), not just a leaf. Helm's values merge deletes a key outright
+whenever an override sets it to `null` (confirmed with `hasKey`/`kindOf`
+against all three mechanisms above: the key is absent afterwards, not
+present-with-a-nil-value), so `.Values.updateStrategy` disappears entirely —
+and Go's text/template panics ("nil pointer evaluating interface{}.maxSurge")
+the moment a *chained* field access tries to take one more step off of a
+vanished intermediate key. `dig` walks the key path defensively instead:
+using a plain `map[string]interface{}`, a missing key or nil node at any
+depth (parent or leaf) falls through to the given default rather than
+panicking.
+
+`dig` requires that exact concrete map type for the container it walks, and
+`.Values` is `chartutil.Values` — a distinct named type Go's type-assertion
+rules do not treat as interchangeable with `map[string]interface{}` even
+though its underlying representation is identical — so `dig ... .Values`
+directly still panics (verified empirically). Round-tripping through
+toJson/fromJson normalizes it to the exact type `dig` needs while preserving
+the same "missing key" shape Helm's merge already produced (a hand-built
+`dict "updateStrategy" .Values.updateStrategy` wrapper does NOT preserve this
+— it turns "key missing" into "key present with a nil value", which `dig`
+itself cannot walk through nil-safely; verified empirically, this is `dig`'s
+one real sharp edge and the reason to reuse this exact conversion instead of
+a lighter hand-rolled wrapper).
+
+The default passed to `dig` is "" — the same sentinel values.yaml already
+uses for "not configured" on all four of these sentinel-defaulted fields (see
+revisionHistoryLimit/minReadySeconds below and updateStrategy.* in
+values.yaml) — so the digged
+value can be fed straight into the existing generic-app-chart.isSet helper
+unchanged: isSet already treats "" as unset and 0/"25%"/etc. as set, which is
+exactly the semantics needed here. (A falsy sentinel like 0 or nil would be
+wrong — a genuine 0 override must still compare as "set" — but "" is safe:
+these fields are ints or IntOrString percentages, never legitimately "".)
+*/}}
+{{- $valuesAsPlainMap := .Values | toJson | fromJson -}}
+{{- $maxSurge := dig "updateStrategy" "maxSurge" "" $valuesAsPlainMap -}}
+{{- $maxUnavailable := dig "updateStrategy" "maxUnavailable" "" $valuesAsPlainMap -}}
+{{- $maxSurgeSet := include "generic-app-chart.isSet" $maxSurge -}}
+{{- $maxUnavailableSet := include "generic-app-chart.isSet" $maxUnavailable -}}
+{{- $revisionHistoryLimitSet := include "generic-app-chart.isSet" .Values.revisionHistoryLimit -}}
+{{- $minReadySecondsSet := include "generic-app-chart.isSet" .Values.minReadySeconds -}}
+{{/* Robustness: preStop is an optional map (like the metrics block used for
+the observability surface) — a caller
+can null out the parent key (`--set preStop=null`, `--set-json
+preStop=null`, or a values file with `preStop: null`), which Helm's merge
+turns into a literal nil rather than an empty map. `hasKey` on a nil value
+panics the whole render, so default it to an empty dict once here before any
+key access below. */}}
+{{- $preStop := .Values.preStop | default dict -}}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ include "generic-app-chart.fullname" . }}
   labels:
     {{- include "generic-app-chart.labels" . | nindent 4 }}
+  {{- with (include "generic-app-chart.annotations" .) }}
+  annotations:
+    {{- nindent 4 . }}
+  {{- end }}
 spec:
   {{- if .Values.persistence.enabled }}
-  # R19: persistence forces a single replica — a Longhorn RWO volume can only
+  # Persistence forces a single replica — a Longhorn RWO volume can only
   # be attached to one pod at a time, so a rolling update would deadlock.
   replicas: 1
   {{- else if .Values.autoscaling.enabled }}
-  # R25: omitted — the HPA (hpa.yaml) owns replica count once autoscaling is
+  # Omitted — the HPA (hpa.yaml) owns replica count once autoscaling is
   # active; setting a static value here would fight the HPA on every sync.
   {{- else }}
   replicas: {{ .Values.replicaCount }}
   {{- end }}
   {{- if .Values.persistence.enabled }}
-  # R19: Recreate (not RollingUpdate) so the old pod detaches the RWO volume
-  # before the new one attaches it.
+  # Recreate (not RollingUpdate) so the old pod detaches the RWO volume
+  # before the new one attaches it. Wins over any configured updateStrategy
+  # below.
   strategy:
     type: Recreate
+  {{- else if or $maxSurgeSet $maxUnavailableSet }}
+  # Configurable RollingUpdate surge/unavailable bounds.
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      {{- if $maxSurgeSet }}
+      maxSurge: {{ $maxSurge }}
+      {{- end }}
+      {{- if $maxUnavailableSet }}
+      maxUnavailable: {{ $maxUnavailable }}
+      {{- end }}
+  {{- end }}
+  {{- if $revisionHistoryLimitSet }}
+  # Bounds retained old ReplicaSets for rollback.
+  revisionHistoryLimit: {{ .Values.revisionHistoryLimit }}
+  {{- end }}
+  {{- if $minReadySecondsSet }}
+  # Minimum ready time before a new pod counts as available.
+  minReadySeconds: {{ .Values.minReadySeconds }}
   {{- end }}
   selector:
     matchLabels:
       {{- include "generic-app-chart.selectorLabels" . | nindent 6 }}
   template:
     metadata:
-      {{- if .Values.config }}
+      {{- with (include "generic-app-chart.podAnnotations" .) }}
       annotations:
-        # R17: forces a rollout when config data changes, since a ConfigMap
-        # update alone does not restart pods that already mounted it.
-        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- nindent 8 . }}
       {{- end }}
       labels:
-        {{- include "generic-app-chart.labels" . | nindent 8 }}
+        {{- include "generic-app-chart.podLabels" . | nindent 8 }}
     spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       serviceAccountName: {{ include "generic-app-chart.serviceAccountName" . }}
       automountServiceAccountToken: {{ .Values.automountServiceAccountToken }}
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
       securityContext:
         {{- include "generic-app-chart.podSecurityContext" . | nindent 8 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if .Values.priorityClassName }}
+      priorityClassName: {{ .Values.priorityClassName }}
+      {{- end }}
+      {{- with .Values.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if .Values.affinity }}
+      affinity:
+        {{- toYaml .Values.affinity | nindent 8 }}
+      {{- else if gt (include "generic-app-chart.effectiveReplicaCount" . | int) 1 }}
+      # No affinity was supplied and this app effectively runs more
+      # than one replica (see .effectiveReplicaCount — this must agree with
+      # the persistence/autoscaling coupling above, otherwise an autoscaled
+      # workload floored above 1 replica by the HPA would render with no
+      # spread at all) — default to a soft (preferred, not required) spread
+      # across nodes so a node failure can't take out every replica at once,
+      # without blocking scheduling the way a hard anti-affinity would.
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                topologyKey: kubernetes.io/hostname
+                labelSelector:
+                  matchLabels:
+                    {{- include "generic-app-chart.selectorLabels" . | nindent 20 }}
+      {{- end }}
       containers:
         - name: {{ .Chart.Name }}
           securityContext:
@@ -71,17 +202,26 @@ spec:
           envFrom:
             {{- toYaml . | nindent 12 }}
           {{- end }}
-          {{- with .Values.livenessProbe }}
+          {{- with $livenessProbe }}
           livenessProbe:
-            {{- toYaml . | nindent 12 }}
+            {{- nindent 12 . }}
           {{- end }}
-          {{- with .Values.readinessProbe }}
+          {{- with $readinessProbe }}
           readinessProbe:
-            {{- toYaml . | nindent 12 }}
+            {{- nindent 12 . }}
           {{- end }}
-          {{- with .Values.startupProbe }}
+          {{- with $startupProbe }}
           startupProbe:
-            {{- toYaml . | nindent 12 }}
+            {{- nindent 12 . }}
+          {{- end }}
+          {{- if .Values.lifecycle }}
+          lifecycle:
+            {{- toYaml .Values.lifecycle | nindent 12 }}
+          {{- else if hasKey $preStop "sleepSeconds" }}
+          lifecycle:
+            preStop:
+              exec:
+                command: ["/bin/sh", "-c", "sleep {{ $preStop.sleepSeconds }}"]
           {{- end }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}

@@ -1,5 +1,5 @@
-# M9 networkpolicy (networkpolicy.yaml) — R27.
-suite: generic-app-chart NetworkPolicy (M9)
+# NetworkPolicy (networkpolicy.yaml).
+suite: generic-app-chart NetworkPolicy
 templates:
   - networkpolicy.yaml
 tests:
@@ -8,7 +8,7 @@ tests:
       - hasDocuments:
           count: 0
 
-  - it: renders a default-deny-ingress NetworkPolicy scoped to this app's pods, allowing only the configured gateway namespace, when enabled (R27)
+  - it: renders a default-deny-ingress NetworkPolicy scoped to this app's pods, allowing only the configured gateway namespace, when enabled
     release:
       name: my-app
     set:
@@ -36,7 +36,7 @@ tests:
       - notExists:
           path: spec.egress
 
-  - it: honors a custom gateway namespaceSelector and podSelector (R27)
+  - it: honors a custom gateway namespaceSelector and podSelector
     set:
       networkPolicy:
         enabled: true
@@ -55,7 +55,7 @@ tests:
           path: spec.ingress[0].from[0].podSelector.matchLabels["app.kubernetes.io/name"]
           value: traefik
 
-  - it: adds Egress to policyTypes and renders the configured egress rules when additionalEgress is set (R27)
+  - it: adds Egress to policyTypes and renders the configured egress rules when additionalEgress is set
     set:
       networkPolicy:
         enabled: true
@@ -77,3 +77,20 @@ tests:
               ports:
                 - protocol: UDP
                   port: 53
+
+  # Generic metadata passthrough.
+  - it: adds commonLabels and commonAnnotations to the NetworkPolicy
+    set:
+      networkPolicy:
+        enabled: true
+      commonLabels:
+        team: platform
+      commonAnnotations:
+        owner: platform-team
+    asserts:
+      - equal:
+          path: metadata.labels["team"]
+          value: platform
+      - equal:
+          path: metadata.annotations["owner"]
+          value: platform-team

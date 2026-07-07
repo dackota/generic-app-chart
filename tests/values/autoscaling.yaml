@@ -1,6 +1,6 @@
-# R31 scenario: autoscaling enabled — a stateless app that scales with load.
-# Persistence stays disabled (default) since the two are mutually exclusive
-# (R20/R25); exercises the HPA path and the Deployment's static-replicas
+# Scenario: autoscaling enabled — a stateless app that scales with load.
+# Persistence stays disabled (default) since the two are mutually exclusive;
+# exercises the HPA path and the Deployment's static-replicas
 # omission.
 image:
   repository: ghcr.io/dackota/podinfo

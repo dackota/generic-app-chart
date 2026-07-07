@@ -1,5 +1,5 @@
-# M5 networking — ReferenceGrant (referencegrant.yaml) — R23, R24 (ADR 0001).
-# R23 property test: the ReferenceGrant must render if and only if routing AND
+# Networking — ReferenceGrant (referencegrant.yaml) — per ADR 0001.
+# Property test: the ReferenceGrant must render if and only if routing AND
 # TLS are both enabled AND the Gateway's namespace differs from the release
 # namespace — it exists solely to authorize the Gateway's cross-namespace
 # certificateRefs read of this app's TLS Secret (ADR 0001: app-owned
@@ -7,16 +7,16 @@
 # never needs a grant). Table covers the adversarial namespace/TLS
 # combinations in one suite so a fix to one case can't silently regress
 # another.
-suite: generic-app-chart ReferenceGrant (M5)
+suite: generic-app-chart ReferenceGrant
 templates:
   - referencegrant.yaml
 tests:
-  - it: renders no ReferenceGrant when routing is disabled (R24)
+  - it: renders no ReferenceGrant when routing is disabled
     asserts:
       - hasDocuments:
           count: 0
 
-  - it: renders no ReferenceGrant when the Gateway namespace equals the release namespace (R23)
+  - it: renders no ReferenceGrant when the Gateway namespace equals the release namespace
     release:
       namespace: my-app-ns
     set:
@@ -29,7 +29,7 @@ tests:
       - hasDocuments:
           count: 0
 
-  - it: renders no ReferenceGrant when the Gateway namespace is unset, defaulting to the release namespace (R23)
+  - it: renders no ReferenceGrant when the Gateway namespace is unset, defaulting to the release namespace
     release:
       namespace: my-app-ns
     set:
@@ -40,7 +40,7 @@ tests:
       - hasDocuments:
           count: 0
 
-  - it: renders no ReferenceGrant when namespaces differ but TLS is disabled — no Secret exists to grant, and the Service never needs one (R23, ADR 0001)
+  - it: renders no ReferenceGrant when namespaces differ but TLS is disabled — no Secret exists to grant, and the Service never needs one (ADR 0001)
     release:
       name: my-app
       namespace: my-app-ns
@@ -56,7 +56,7 @@ tests:
       - hasDocuments:
           count: 0
 
-  - it: renders a ReferenceGrant scoped by name to only this app's TLS Secret when namespaces differ and TLS is enabled (R23, ADR 0001)
+  - it: renders a ReferenceGrant scoped by name to only this app's TLS Secret when namespaces differ and TLS is enabled (ADR 0001)
     release:
       name: my-app
       namespace: my-app-ns
@@ -92,3 +92,26 @@ tests:
             group: ""
             kind: Service
             name: my-app-generic-app-chart
+
+  # Generic metadata passthrough.
+  - it: adds commonLabels and commonAnnotations to the ReferenceGrant
+    release:
+      name: my-app
+      namespace: my-app-ns
+    set:
+      routing:
+        enabled: true
+        hostnames: ["my-app.dackota.dev"]
+        gateway:
+          namespace: traefik
+      commonLabels:
+        team: platform
+      commonAnnotations:
+        owner: platform-team
+    asserts:
+      - equal:
+          path: metadata.labels["team"]
+          value: platform
+      - equal:
+          path: metadata.annotations["owner"]
+          value: platform-team

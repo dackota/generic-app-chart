@@ -21,6 +21,7 @@ this chart renders:
 | **metrics-server** | HPA target metrics (`templates/hpa.yaml`) | Implemented |
 | **Gateway API** (Traefik as the implementation) | HTTPRoute, ReferenceGrant | Implemented |
 | **cert-manager** + a `letsencrypt` ClusterIssuer | Certificate | Implemented |
+| **prometheus-operator CRDs** | `metrics.serviceMonitor.enabled` ServiceMonitor (`templates/servicemonitor.yaml`) | Implemented |
 
 ## Installing
 
@@ -37,6 +38,16 @@ dependency in its own thin `Chart.yaml` plus a `values.yaml` — see the
 
 - **Deployment** (`templates/deployment.yaml`) — the workload container, built
   from `image.*`, `command`/`args`, `env`/`envFrom`, probes, and resources.
+  `imagePullSecrets` references existing image-pull Secret(s) by name for
+  private-registry pulls, omitted entirely when unset. `extraVolumes`/
+  `extraVolumeMounts` accept arbitrary native Volume/VolumeMount shapes (e.g. a
+  referenced Secret or ConfigMap volume), assembled through the same
+  `_volumes.tpl` partial as the automatic `/tmp` emptyDir, `extraEmptyDirs`,
+  and the persistence PVC — all of them coexist. `livenessProbe`/
+  `readinessProbe`/`startupProbe` each accept a raw native Probe block, a
+  `{path, port}`/`{port}` shorthand, or (readiness only) fall back to a
+  `tcpSocket` check on the primary service port when left unset — see the
+  comments in `values.yaml`.
 - **Service** (`templates/service.yaml`) — `ClusterIP` by default (overridable
   via `service.type`), mapping `service.ports` onto the pod's container ports.
 - **ServiceAccount** (`templates/serviceaccount.yaml`) — a dedicated SA per
@@ -67,6 +78,9 @@ dependency in its own thin `Chart.yaml` plus a `values.yaml` — see the
 - **NetworkPolicy** (`templates/networkpolicy.yaml`) — rendered when
   `networkPolicy.enabled`; default-deny ingress except from the configured
   gateway namespace/pods, with optional additional egress allowances.
+- **ServiceMonitor** (`templates/servicemonitor.yaml`) — rendered when
+  `metrics.serviceMonitor.enabled`, selecting this chart's own Service on a
+  named metrics port for Prometheus Operator to scrape.
 
 This chart never renders a Secret resource. It consumes existing in-cluster
 Secrets only, via `envFrom.secretRef` / `env[].valueFrom.secretKeyRef` — see
@@ -144,6 +158,41 @@ rendering as normal for in-cluster access.
   namespace/pod-selector; `networkPolicy.additionalEgress` supplies optional
   egress allowances (native `NetworkPolicyEgressRule` entries).
 
+## Observability surface
+
+Both off by default:
+
+- `metrics.scrape.enabled: true` renders `prometheus.io/scrape: "true"`,
+  `prometheus.io/port`, and `prometheus.io/path` pod annotations via the
+  generic metadata passthrough mechanism above (`_metadata.tpl`) — merged
+  with (never dropping) any `podAnnotations`/`commonAnnotations` already set,
+  the same way `checksum/config` is.
+- `metrics.serviceMonitor.enabled: true` renders a
+  `monitoring.coreos.com/v1` ServiceMonitor (`templates/servicemonitor.yaml`)
+  selecting this chart's own Service by its stable selector labels, scraping
+  the named port/path configured under `metrics.serviceMonitor.port`/`.path`
+  (that port name must already exist under `service.ports`). Requires the
+  prometheus-operator CRDs to be installed cluster-side.
+
+This is infra-only: it does not instrument application code with RED
+metrics, and it does not wire a custom-metric HPA off scraped values.
+
+## Generic metadata passthrough
+
+- `podAnnotations`/`podLabels` add to the pod template only, merged with (and
+  never overriding) the chart-managed pod labels/selector labels and the
+  `checksum/config` annotation.
+- `commonLabels`/`commonAnnotations` add to **every** resource this chart
+  renders, merged with (and never overriding) that resource's chart-managed
+  labels/annotations.
+- `serviceAnnotations` adds to the Service only, merged with
+  `commonAnnotations` (`serviceAnnotations` wins on conflict, being the more
+  specific of the two).
+
+Chart-managed keys — selector labels, `helm.sh/chart`, `app.kubernetes.io/*`,
+and the `checksum/config` rollout trigger — always win when a user-supplied
+key collides with one of them.
+
 ## Publishing
 
 Releases are cut by [release-please](https://github.com/googleapis/release-please)
@@ -167,10 +216,10 @@ helm unittest .
 
 Suites live under `tests/*_test.yaml` (one per module: naming/labels,
 security defaults, workload, persistence, config, service, serviceaccount,
-HTTPRoute, Certificate, ReferenceGrant, HPA, PDB, NetworkPolicy, plus the R28
-secret, R12 security opt-out, R24 cluster-only, and R25 HPA<->persistence
-property/invariant suites). Named scenario values files live under
-`tests/values/`:
+HTTPRoute, Certificate, ReferenceGrant, HPA, PDB, NetworkPolicy, ServiceMonitor,
+plus the never-renders-a-secret, security opt-out, cluster-only, and
+HPA<->persistence property/invariant suites). Named scenario values files
+live under `tests/values/`:
 
 - `default.yaml` — minimal/base case (stateless app).
 - `persistent.yaml` — persistence enabled (stateful app).
@@ -179,4 +228,5 @@ property/invariant suites). Named scenario values files live under
 - `cluster-only.yaml` — routing disabled, NetworkPolicy enabled (internal,
   locked-down app).
 - `full.yaml` — routing + TLS through a cross-namespace Gateway, autoscaling,
-  PDB, and NetworkPolicy all together.
+  PDB, NetworkPolicy, the observability surface, and generic metadata
+  passthrough all together.

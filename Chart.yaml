@@ -6,7 +6,7 @@ description: >-
 type: application
 version: 0.3.1
 appVersion: "1.0.0"
-# R29: minimum cluster version this chart targets. See README "Prerequisites"
+# Minimum cluster version this chart targets. See README "Prerequisites"
 # for the CRDs/capabilities (Gateway API, cert-manager, Longhorn, metrics-server)
 # required by the full app surface this chart renders across all its tasks.
 kubeVersion: ">=1.27.0-0"

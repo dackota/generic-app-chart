@@ -1,12 +1,12 @@
 {{/*
-M2 security defaults — R9, R10, R11, R12, R13.
+Security defaults.
 
 Deep, reusable helper producing the restricted-PSA-compliant pod- and
 container-level securityContext blocks. Every default is merged field-by-field
 with `.Values.podSecurityContext` / `.Values.containerSecurityContext`
 (mergeOverwrite over a deep copy of the chart defaults) so an app can override
 exactly one field (e.g. a specific runAsUser) without disabling the rest of
-the strict security posture (R12). M3's Deployment template calls into this.
+the strict security posture. The Deployment template calls into this.
 */}}
 
 {{/*

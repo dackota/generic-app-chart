@@ -1,5 +1,5 @@
 {{/*
-M4 persistence — R18. Only rendered when persistence is enabled and the
+Persistence. Only rendered when persistence is enabled and the
 caller hasn't supplied an existingClaim to reuse instead.
 */}}
 {{- if and .Values.persistence.enabled (not .Values.persistence.existingClaim) }}
@@ -9,6 +9,10 @@ metadata:
   name: {{ include "generic-app-chart.fullname" . }}
   labels:
     {{- include "generic-app-chart.labels" . | nindent 4 }}
+  {{- with (include "generic-app-chart.annotations" .) }}
+  annotations:
+    {{- nindent 4 . }}
+  {{- end }}
 spec:
   # RWO only — Longhorn multi-attach isn't supported, and the persistence ->
   # Recreate/replicas=1 coupling in deployment.yaml relies on a single writer.

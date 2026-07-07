@@ -1,9 +1,9 @@
-# M5 networking — Certificate (certificate.yaml) — R22, R24.
-suite: generic-app-chart Certificate (M5)
+# Networking — Certificate (certificate.yaml).
+suite: generic-app-chart Certificate
 templates:
   - certificate.yaml
 tests:
-  - it: renders no Certificate when routing is disabled (R24)
+  - it: renders no Certificate when routing is disabled
     asserts:
       - hasDocuments:
           count: 0
@@ -19,7 +19,7 @@ tests:
       - hasDocuments:
           count: 0
 
-  - it: renders a Certificate with dnsNames from the route hosts, a letsencrypt ClusterIssuer, and a target secretName (R22)
+  - it: renders a Certificate with dnsNames from the route hosts, a letsencrypt ClusterIssuer, and a target secretName
     release:
       name: my-app
     set:
@@ -43,7 +43,7 @@ tests:
           path: spec.secretName
           value: my-app-generic-app-chart-tls
 
-  - it: honors an explicit secretName and issuerRef override (R22)
+  - it: honors an explicit secretName and issuerRef override
     set:
       routing:
         enabled: true
@@ -61,3 +61,21 @@ tests:
       - equal:
           path: spec.issuerRef.name
           value: custom-issuer
+
+  # Generic metadata passthrough.
+  - it: adds commonLabels and commonAnnotations to the Certificate
+    set:
+      routing:
+        enabled: true
+        hostnames: ["my-app.dackota.dev"]
+      commonLabels:
+        team: platform
+      commonAnnotations:
+        owner: platform-team
+    asserts:
+      - equal:
+          path: metadata.labels["team"]
+          value: platform
+      - equal:
+          path: metadata.annotations["owner"]
+          value: platform-team

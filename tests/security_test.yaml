@@ -1,9 +1,9 @@
-# M2 security defaults (_security.tpl) — R9, R10, R11, R12, R13.
+# Security defaults (_security.tpl).
 # Strict, opt-out: restricted-PSA-compliant defaults ship on; each field is
-# independently overridable without disabling the others (R12, asserted below
+# independently overridable without disabling the others (asserted below
 # as a per-field opt-out invariant — one override must never disturb a
 # sibling field's default).
-suite: generic-app-chart security defaults (M2)
+suite: generic-app-chart security defaults
 templates:
   - deployment.yaml
 tests:
@@ -40,7 +40,7 @@ tests:
           path: spec.template.spec.containers[0].securityContext.capabilities.drop
           value: ["ALL"]
 
-  # R12 property test: the opt-out merge is per-field, not all-or-nothing.
+  # Property test: the opt-out merge is per-field, not all-or-nothing.
   # Exhaustively exercise every pod- and container-level default field: for
   # each one, overriding it alone must leave every sibling field's default
   # untouched. One violation here would silently weaken every future app's
@@ -227,13 +227,13 @@ tests:
           path: spec.template.spec.containers[0].securityContext.privileged
           value: false
 
-  - it: defaults automountServiceAccountToken to false (R13)
+  - it: defaults automountServiceAccountToken to false
     asserts:
       - equal:
           path: spec.template.spec.automountServiceAccountToken
           value: false
 
-  - it: allows overriding automountServiceAccountToken per app (R13)
+  - it: allows overriding automountServiceAccountToken per app
     set:
       automountServiceAccountToken: true
     asserts:
@@ -241,7 +241,7 @@ tests:
           path: spec.template.spec.automountServiceAccountToken
           value: true
 
-  - it: auto-mounts a writable /tmp emptyDir when readOnlyRootFilesystem is true (R11)
+  - it: auto-mounts a writable /tmp emptyDir when readOnlyRootFilesystem is true
     asserts:
       - contains:
           path: spec.template.spec.volumes
@@ -254,7 +254,7 @@ tests:
             name: tmp
             mountPath: /tmp
 
-  - it: omits the auto /tmp emptyDir when readOnlyRootFilesystem is overridden to false (R11, R12)
+  - it: omits the auto /tmp emptyDir when readOnlyRootFilesystem is overridden to false
     set:
       containerSecurityContext:
         readOnlyRootFilesystem: false
@@ -266,7 +266,7 @@ tests:
             emptyDir: {}
           any: true
 
-  - it: supports additional writable emptyDir mounts via values (R11)
+  - it: supports additional writable emptyDir mounts via values
     set:
       extraEmptyDirs:
         - name: cache

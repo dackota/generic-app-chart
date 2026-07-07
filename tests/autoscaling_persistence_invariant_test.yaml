@@ -1,11 +1,11 @@
-# R25/R20 property test: HPA<->persistence mutual exclusion is a chart
+# Property test: HPA<->persistence mutual exclusion is a chart
 # invariant, not a caller responsibility. Across every combination of
 # autoscaling.enabled and persistence.enabled, the HPA must render if and only
 # if autoscaling.enabled && !persistence.enabled, and the Deployment's static
 # replicas must be present if and only if the HPA is absent. helm-unittest has
 # no generative-testing primitive, so this is a tight table covering all 4
 # combinations rather than a single generated property.
-suite: generic-app-chart HPA<->persistence mutual exclusion (R25)
+suite: generic-app-chart HPA<->persistence mutual exclusion
 templates:
   - hpa.yaml
   - deployment.yaml

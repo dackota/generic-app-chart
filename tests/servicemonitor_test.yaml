@@ -1,0 +1,99 @@
+# Observability surface — opt-in ServiceMonitor (servicemonitor.yaml).
+suite: generic-app-chart ServiceMonitor
+templates:
+  - servicemonitor.yaml
+tests:
+  - it: renders no ServiceMonitor when metrics.serviceMonitor is disabled by default
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders a monitoring.coreos.com/v1 ServiceMonitor selecting this app's Service on the named metrics port/path when enabled
+    release:
+      name: my-app
+    set:
+      metrics:
+        serviceMonitor:
+          enabled: true
+          port: metrics
+          path: /custom-metrics
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: ServiceMonitor
+      - isAPIVersion:
+          of: monitoring.coreos.com/v1
+      - equal:
+          path: metadata.name
+          value: my-app-generic-app-chart
+      - equal:
+          path: spec.selector.matchLabels["app.kubernetes.io/name"]
+          value: generic-app-chart
+      - equal:
+          path: spec.selector.matchLabels["app.kubernetes.io/instance"]
+          value: my-app
+      - equal:
+          path: spec.endpoints[0].port
+          value: metrics
+      - equal:
+          path: spec.endpoints[0].path
+          value: /custom-metrics
+
+  - it: omits the endpoint interval when unset
+    set:
+      metrics:
+        serviceMonitor:
+          enabled: true
+    asserts:
+      - notExists:
+          path: spec.endpoints[0].interval
+
+  - it: renders the endpoint interval when set
+    set:
+      metrics:
+        serviceMonitor:
+          enabled: true
+          interval: 30s
+    asserts:
+      - equal:
+          path: spec.endpoints[0].interval
+          value: 30s
+
+  # Generic metadata passthrough — reuses the same shared helpers as
+  # every other rendered resource.
+  - it: adds commonLabels and commonAnnotations to the ServiceMonitor
+    set:
+      metrics:
+        serviceMonitor:
+          enabled: true
+      commonLabels:
+        team: platform
+      commonAnnotations:
+        owner: platform-team
+    asserts:
+      - equal:
+          path: metadata.labels["team"]
+          value: platform
+      - equal:
+          path: metadata.annotations["owner"]
+          value: platform-team
+
+  # Property test: the metrics block must never panic the render when a
+  # caller explicitly nulls it out or an intermediate key (the
+  # "nulled-intermediate-key" bug class) — the chart must fall back to its
+  # off-by-default behavior instead of crashing.
+  - it: never panics and stays off by default when metrics is explicitly nulled (robustness)
+    set:
+      metrics: null
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: never panics and stays off by default when metrics.serviceMonitor is explicitly nulled (robustness)
+    set:
+      metrics:
+        serviceMonitor: null
+    asserts:
+      - hasDocuments:
+          count: 0

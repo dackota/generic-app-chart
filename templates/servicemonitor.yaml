@@ -1,0 +1,35 @@
+{{/*
+M-observability. Opt-in ServiceMonitor (monitoring.coreos.com/v1)
+selecting this app's Service by its stable selector labels on a named
+metrics port already declared under service.ports, so Prometheus Operator
+can scrape it. Off by default — rendering this resource requires the
+prometheus-operator CRDs to already be installed cluster-side. Guards
+against the "nulled-intermediate-key" panic class the same way
+generic-app-chart.scrapeAnnotations does (_metadata.tpl): defaults
+.Values.metrics and its .serviceMonitor sub-key to an empty dict before
+reading .enabled/.port/.path/.interval.
+*/}}
+{{- $metrics := .Values.metrics | default dict -}}
+{{- $serviceMonitor := $metrics.serviceMonitor | default dict -}}
+{{- if $serviceMonitor.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "generic-app-chart.fullname" . }}
+  labels:
+    {{- include "generic-app-chart.labels" . | nindent 4 }}
+  {{- with (include "generic-app-chart.annotations" .) }}
+  annotations:
+    {{- nindent 4 . }}
+  {{- end }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "generic-app-chart.selectorLabels" . | nindent 6 }}
+  endpoints:
+    - port: {{ $serviceMonitor.port }}
+      path: {{ $serviceMonitor.path }}
+      {{- with $serviceMonitor.interval }}
+      interval: {{ . }}
+      {{- end }}
+{{- end }}

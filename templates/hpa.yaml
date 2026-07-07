@@ -1,8 +1,8 @@
 {{/*
-M8 scaling & disruption — R25. Suppressed whenever persistence is enabled
-(R20/R25 mutual exclusion) — a Longhorn RWO volume can only be attached to one
-pod, so the chart never lets the HPA drive replica count alongside it,
-regardless of autoscaling.enabled.
+Scaling & disruption. Suppressed whenever persistence is enabled
+(persistence and autoscaling are mutually exclusive) — a Longhorn RWO volume
+can only be attached to one pod, so the chart never lets the HPA drive
+replica count alongside it, regardless of autoscaling.enabled.
 */}}
 {{- if and .Values.autoscaling.enabled (not .Values.persistence.enabled) }}
 apiVersion: autoscaling/v2
@@ -11,6 +11,10 @@ metadata:
   name: {{ include "generic-app-chart.fullname" . }}
   labels:
     {{- include "generic-app-chart.labels" . | nindent 4 }}
+  {{- with (include "generic-app-chart.annotations" .) }}
+  annotations:
+    {{- nindent 4 . }}
+  {{- end }}
 spec:
   scaleTargetRef:
     apiVersion: apps/v1

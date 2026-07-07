@@ -1,4 +1,4 @@
-# R31 scenario: NetworkPolicy enabled — a security-conscious app that is
+# Scenario: NetworkPolicy enabled — a security-conscious app that is
 # network-isolated by default, reachable only from the shared Traefik Gateway
 # namespace.
 image:

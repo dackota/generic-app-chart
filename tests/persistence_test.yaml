@@ -1,6 +1,6 @@
-# M4 persistence (pvc.yaml + the Recreate/replicas=1 coupling in
-# deployment.yaml) — R18, R19, R20.
-suite: generic-app-chart persistence (M4)
+# Persistence (pvc.yaml + the Recreate/replicas=1 coupling in
+# deployment.yaml).
+suite: generic-app-chart persistence
 templates:
   - pvc.yaml
   - deployment.yaml
@@ -11,7 +11,7 @@ tests:
       - hasDocuments:
           count: 0
 
-  - it: renders an RWO PVC with the configured size, storageClass, when persistence is enabled (R18)
+  - it: renders an RWO PVC with the configured size, storageClass, when persistence is enabled
     template: pvc.yaml
     set:
       persistence:
@@ -31,7 +31,7 @@ tests:
           path: spec.storageClassName
           value: longhorn
 
-  - it: defaults the storageClass to longhorn (R18)
+  - it: defaults the storageClass to longhorn
     template: pvc.yaml
     set:
       persistence.enabled: true
@@ -40,7 +40,7 @@ tests:
           path: spec.storageClassName
           value: longhorn
 
-  - it: renders no PVC when an existingClaim is supplied (R18)
+  - it: renders no PVC when an existingClaim is supplied
     template: pvc.yaml
     set:
       persistence:
@@ -50,7 +50,25 @@ tests:
       - hasDocuments:
           count: 0
 
-  - it: uses a single replica and defaults to the configured replicaCount when persistence is disabled (R19)
+  # Generic metadata passthrough.
+  - it: adds commonLabels and commonAnnotations to the PVC
+    template: pvc.yaml
+    set:
+      persistence:
+        enabled: true
+      commonLabels:
+        team: platform
+      commonAnnotations:
+        owner: platform-team
+    asserts:
+      - equal:
+          path: metadata.labels["team"]
+          value: platform
+      - equal:
+          path: metadata.annotations["owner"]
+          value: platform-team
+
+  - it: uses a single replica and defaults to the configured replicaCount when persistence is disabled
     template: deployment.yaml
     set:
       replicaCount: 3
@@ -61,7 +79,7 @@ tests:
       - notExists:
           path: spec.strategy
 
-  - it: forces strategy Recreate and replicas 1 when persistence is enabled, regardless of replicaCount (R19)
+  - it: forces strategy Recreate and replicas 1 when persistence is enabled, regardless of replicaCount
     template: deployment.yaml
     set:
       replicaCount: 3
@@ -75,7 +93,7 @@ tests:
           path: spec.strategy.type
           value: Recreate
 
-  - it: mounts the created PVC into the container at the configured mountPath (R18)
+  - it: mounts the created PVC into the container at the configured mountPath
     template: deployment.yaml
     release:
       name: my-app
@@ -96,7 +114,7 @@ tests:
             persistentVolumeClaim:
               claimName: my-app-generic-app-chart
 
-  - it: mounts an existingClaim into the container instead of creating a PVC (R18)
+  - it: mounts an existingClaim into the container instead of creating a PVC
     template: deployment.yaml
     set:
       persistence:
@@ -111,7 +129,7 @@ tests:
             persistentVolumeClaim:
               claimName: my-existing-pvc
 
-  - it: does not mount a persistence volume when persistence is disabled (R18)
+  - it: does not mount a persistence volume when persistence is disabled
     template: deployment.yaml
     asserts:
       - notContains:
@@ -119,3 +137,37 @@ tests:
           content:
             name: data
           any: true
+
+  - it: keeps strategy Recreate and renders no rollingUpdate block when persistence is enabled, even with a configured updateStrategy, since persistence takes precedence over the update strategy
+    template: deployment.yaml
+    set:
+      persistence:
+        enabled: true
+      updateStrategy:
+        maxSurge: 1
+        maxUnavailable: 0
+    asserts:
+      - equal:
+          path: spec.strategy.type
+          value: Recreate
+      - notExists:
+          path: spec.strategy.rollingUpdate
+
+  # Regression: nulling the updateStrategy PARENT must not crash the render
+  # even when persistence is enabled and updateStrategy is irrelevant to the
+  # outcome (persistence always overrides the update strategy before
+  # updateStrategy is ever read for rendering) — the field still gets
+  # dereferenced while computing $maxSurgeSet/$maxUnavailableSet, so this
+  # path must be dig-safe too.
+  - it: keeps strategy Recreate and does not crash when persistence is enabled and updateStrategy is set to null, since persistence takes precedence over the update strategy
+    template: deployment.yaml
+    set:
+      persistence:
+        enabled: true
+      updateStrategy: null
+    asserts:
+      - equal:
+          path: spec.strategy.type
+          value: Recreate
+      - notExists:
+          path: spec.strategy.rollingUpdate

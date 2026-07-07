@@ -1,14 +1,14 @@
-# M5 networking — HTTPRoute (httproute.yaml) — R21, R24.
-suite: generic-app-chart HTTPRoute (M5)
+# Networking — HTTPRoute (httproute.yaml).
+suite: generic-app-chart HTTPRoute
 templates:
   - httproute.yaml
 tests:
-  - it: renders no HTTPRoute when routing is disabled (R24)
+  - it: renders no HTTPRoute when routing is disabled
     asserts:
       - hasDocuments:
           count: 0
 
-  - it: renders an HTTPRoute with hostnames, parentRef, rules/matches, and a backendRef to the Service (R21)
+  - it: renders an HTTPRoute with hostnames, parentRef, rules/matches, and a backendRef to the Service
     release:
       name: my-app
     set:
@@ -44,7 +44,7 @@ tests:
       - isNotEmpty:
           path: spec.rules[0].matches
 
-  - it: omits sectionName from the parentRef when unset and defaults the Gateway namespace to the release namespace (R21, R23)
+  - it: omits sectionName from the parentRef when unset and defaults the Gateway namespace to the release namespace
     release:
       name: my-app
       namespace: my-app-ns
@@ -60,3 +60,21 @@ tests:
           value:
             - name: shared-gateway
               namespace: my-app-ns
+
+  # Generic metadata passthrough.
+  - it: adds commonLabels and commonAnnotations to the HTTPRoute
+    set:
+      routing:
+        enabled: true
+        hostnames: ["my-app.dackota.dev"]
+      commonLabels:
+        team: platform
+      commonAnnotations:
+        owner: platform-team
+    asserts:
+      - equal:
+          path: metadata.labels["team"]
+          value: platform
+      - equal:
+          path: metadata.annotations["owner"]
+          value: platform-team

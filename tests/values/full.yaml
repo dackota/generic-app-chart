@@ -1,11 +1,26 @@
-# R31 scenario: the "everything on" case — routing + TLS through a
+# Scenario: the "everything on" case — routing + TLS through a
 # cross-namespace Gateway (exercising the ReferenceGrant), autoscaling, a PDB,
-# NetworkPolicy, and config, all together. Persistence stays disabled since it
-# is mutually exclusive with autoscaling (R20/R25) — that combination is
-# covered by persistent.yaml instead.
+# NetworkPolicy, config, imagePullSecrets, and extraVolumes/extraVolumeMounts,
+# all together. Persistence stays disabled since it is mutually
+# exclusive with autoscaling — that combination (persistence +
+# extraVolumes coexisting with the PVC) is covered by the dedicated
+# deployment_test.yaml coexistence test instead.
 image:
   repository: ghcr.io/dackota/change-tracking-dashboard
   tag: "1.0.0"
+
+imagePullSecrets:
+  - name: existing-registry-secret
+
+extraVolumes:
+  - name: tls-certs
+    secret:
+      secretName: existing-tls-secret
+
+extraVolumeMounts:
+  - name: tls-certs
+    mountPath: /etc/tls
+    readOnly: true
 
 service:
   ports:
@@ -13,9 +28,25 @@ service:
       port: 80
       targetPort: 8080
       protocol: TCP
+    - name: metrics
+      port: 9090
+      targetPort: 9090
+      protocol: TCP
 
 config:
   LOG_LEVEL: info
+
+# Observability surface, exercised alongside every other feature.
+metrics:
+  scrape:
+    enabled: true
+    port: 9090
+    path: /metrics
+  serviceMonitor:
+    enabled: true
+    port: metrics
+    path: /metrics
+    interval: 30s
 
 routing:
   enabled: true
@@ -47,3 +78,15 @@ networkPolicy:
     namespaceSelector:
       matchLabels:
         kubernetes.io/metadata.name: traefik
+
+# Generic metadata passthrough, exercised alongside every other feature.
+commonLabels:
+  cost-center: ctd
+commonAnnotations:
+  owner: platform-team
+podAnnotations:
+  vault.hashicorp.com/agent-inject: "true"
+podLabels:
+  tier: web
+serviceAnnotations:
+  external-dns.alpha.kubernetes.io/hostname: ctd.dackota.dev

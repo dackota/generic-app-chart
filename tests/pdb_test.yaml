@@ -1,5 +1,5 @@
-# M8 scaling & disruption — PodDisruptionBudget (pdb.yaml) — R26.
-suite: generic-app-chart PodDisruptionBudget (M8)
+# Scaling & disruption — PodDisruptionBudget (pdb.yaml).
+suite: generic-app-chart PodDisruptionBudget
 templates:
   - pdb.yaml
 tests:
@@ -8,10 +8,19 @@ tests:
       - hasDocuments:
           count: 0
 
-  - it: renders a PDB with the default minAvailable and a selector matching the pods when enabled (R26)
+  - it: renders no PDB when replicaCount is 1 (the default), even when pdb.enabled
+    set:
+      pdb:
+        enabled: true
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders a PDB with the default minAvailable and a selector matching the pods when enabled
     release:
       name: my-app
     set:
+      replicaCount: 2
       pdb:
         enabled: true
     asserts:
@@ -31,8 +40,9 @@ tests:
           path: spec.selector.matchLabels["app.kubernetes.io/instance"]
           value: my-app
 
-  - it: honors an overridden minAvailable (R26)
+  - it: honors an overridden minAvailable
     set:
+      replicaCount: 2
       pdb:
         enabled: true
         minAvailable: 3
@@ -41,8 +51,9 @@ tests:
           path: spec.minAvailable
           value: 3
 
-  - it: uses maxUnavailable instead of minAvailable when set, since they are mutually exclusive (R26)
+  - it: uses maxUnavailable instead of minAvailable when set, since they are mutually exclusive
     set:
+      replicaCount: 2
       pdb:
         enabled: true
         maxUnavailable: 2
@@ -52,3 +63,57 @@ tests:
           value: 2
       - notExists:
           path: spec.minAvailable
+
+  # Generic metadata passthrough.
+  - it: adds commonLabels and commonAnnotations to the PDB
+    set:
+      replicaCount: 2
+      pdb:
+        enabled: true
+      commonLabels:
+        team: platform
+      commonAnnotations:
+        owner: platform-team
+    asserts:
+      - equal:
+          path: metadata.labels["team"]
+          value: platform
+      - equal:
+          path: metadata.annotations["owner"]
+          value: platform-team
+
+  - it: renders no PDB when persistence forces a single replica, even with a higher replicaCount and pdb.enabled
+    set:
+      replicaCount: 4
+      persistence:
+        enabled: true
+      pdb:
+        enabled: true
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders the PDB when autoscaling's minReplicas floors the effective replica count above 1
+    set:
+      autoscaling:
+        enabled: true
+        minReplicas: 3
+      pdb:
+        enabled: true
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: spec.minAvailable
+          value: 1
+
+  - it: renders no PDB when autoscaling's minReplicas is 1, even with pdb.enabled
+    set:
+      autoscaling:
+        enabled: true
+        minReplicas: 1
+      pdb:
+        enabled: true
+    asserts:
+      - hasDocuments:
+          count: 0

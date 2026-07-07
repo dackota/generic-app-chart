@@ -4,6 +4,10 @@ metadata:
   name: {{ include "generic-app-chart.fullname" . }}
   labels:
     {{- include "generic-app-chart.labels" . | nindent 4 }}
+  {{- with (include "generic-app-chart.serviceAnnotations" .) }}
+  annotations:
+    {{- nindent 4 . }}
+  {{- end }}
 spec:
   type: {{ .Values.service.type }}
   selector:
