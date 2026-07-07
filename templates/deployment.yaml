@@ -3,6 +3,8 @@
 {{/* R41: "set/unset" (not truthiness) checks — an explicit 0 must still render. */}}
 {{- $maxSurge := toString .Values.updateStrategy.maxSurge -}}
 {{- $maxUnavailable := toString .Values.updateStrategy.maxUnavailable -}}
+{{- $revisionHistoryLimit := toString .Values.revisionHistoryLimit -}}
+{{- $minReadySeconds := toString .Values.minReadySeconds -}}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -38,13 +40,13 @@ spec:
       maxUnavailable: {{ .Values.updateStrategy.maxUnavailable }}
       {{- end }}
   {{- end }}
-  {{- with .Values.revisionHistoryLimit }}
+  {{- if ne $revisionHistoryLimit "" }}
   # R41: bounds retained old ReplicaSets for rollback.
-  revisionHistoryLimit: {{ . }}
+  revisionHistoryLimit: {{ .Values.revisionHistoryLimit }}
   {{- end }}
-  {{- with .Values.minReadySeconds }}
+  {{- if ne $minReadySeconds "" }}
   # R41: minimum ready time before a new pod counts as available.
-  minReadySeconds: {{ . }}
+  minReadySeconds: {{ .Values.minReadySeconds }}
   {{- end }}
   selector:
     matchLabels:

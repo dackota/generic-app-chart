@@ -316,6 +316,23 @@ tests:
           path: spec.minReadySeconds
           value: 10
 
+  # Regression: an explicit 0 is a meaningful, distinct-from-default value
+  # (immediate ReplicaSet cleanup / no minimum ready wait) and must not be
+  # dropped by falsy-zero truthiness checks — see the maxSurge/maxUnavailable
+  # zero-value test below for the sibling case this mirrors.
+  - it: renders revisionHistoryLimit and minReadySeconds when explicitly set to 0 (R41)
+    template: deployment.yaml
+    set:
+      revisionHistoryLimit: 0
+      minReadySeconds: 0
+    asserts:
+      - equal:
+          path: spec.revisionHistoryLimit
+          value: 0
+      - equal:
+          path: spec.minReadySeconds
+          value: 0
+
   - it: renders a configurable RollingUpdate strategy with maxSurge and maxUnavailable when persistence is disabled (R41)
     template: deployment.yaml
     set:
