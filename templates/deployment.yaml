@@ -9,6 +9,56 @@ port-less probe shorthand — see templates/_probes.tpl. */}}
 {{- $livenessProbe := include "generic-app-chart.probe" (dict "value" .Values.livenessProbe "port" $primaryPort "default" false "name" "livenessProbe") -}}
 {{- $readinessProbe := include "generic-app-chart.probe" (dict "value" .Values.readinessProbe "port" $primaryPort "default" true "name" "readinessProbe") -}}
 {{- $startupProbe := include "generic-app-chart.probe" (dict "value" .Values.startupProbe "port" $primaryPort "default" false "name" "startupProbe") -}}
+{{/*
+R41: "presence and non-nil" (not truthiness, not string-emptiness) checks —
+an explicit 0 must still render; unset AND an explicit `null` override must
+both be omitted. See generic-app-chart.isSet (_values.tpl) for why.
+
+updateStrategy.maxSurge/maxUnavailable are read through `dig`, never through a
+direct `.Values.updateStrategy.maxSurge` chain: `updateStrategy` is itself an
+optional map, and a caller can null out the PARENT (`--set
+updateStrategy=null`, `--set-json updateStrategy=null`, or a values file with
+`updateStrategy: null` — all three verified empirically to behave the same
+way below), not just a leaf. Helm's values merge deletes a key outright
+whenever an override sets it to `null` (confirmed with `hasKey`/`kindOf`
+against all three mechanisms above: the key is absent afterwards, not
+present-with-a-nil-value), so `.Values.updateStrategy` disappears entirely —
+and Go's text/template panics ("nil pointer evaluating interface{}.maxSurge")
+the moment a *chained* field access tries to take one more step off of a
+vanished intermediate key. `dig` walks the key path defensively instead:
+using a plain `map[string]interface{}`, a missing key or nil node at any
+depth (parent or leaf) falls through to the given default rather than
+panicking.
+
+`dig` requires that exact concrete map type for the container it walks, and
+`.Values` is `chartutil.Values` — a distinct named type Go's type-assertion
+rules do not treat as interchangeable with `map[string]interface{}` even
+though its underlying representation is identical — so `dig ... .Values`
+directly still panics (verified empirically). Round-tripping through
+toJson/fromJson normalizes it to the exact type `dig` needs while preserving
+the same "missing key" shape Helm's merge already produced (a hand-built
+`dict "updateStrategy" .Values.updateStrategy` wrapper does NOT preserve this
+— it turns "key missing" into "key present with a nil value", which `dig`
+itself cannot walk through nil-safely; verified empirically, this is `dig`'s
+one real sharp edge and the reason to reuse this exact conversion instead of
+a lighter hand-rolled wrapper).
+
+The default passed to `dig` is "" — the same sentinel values.yaml already
+uses for "not configured" on all four R41 fields (see revisionHistoryLimit/
+minReadySeconds below and updateStrategy.* in values.yaml) — so the digged
+value can be fed straight into the existing generic-app-chart.isSet helper
+unchanged: isSet already treats "" as unset and 0/"25%"/etc. as set, which is
+exactly the semantics needed here. (A falsy sentinel like 0 or nil would be
+wrong — a genuine 0 override must still compare as "set" — but "" is safe:
+these fields are ints or IntOrString percentages, never legitimately "".)
+*/}}
+{{- $valuesAsPlainMap := .Values | toJson | fromJson -}}
+{{- $maxSurge := dig "updateStrategy" "maxSurge" "" $valuesAsPlainMap -}}
+{{- $maxUnavailable := dig "updateStrategy" "maxUnavailable" "" $valuesAsPlainMap -}}
+{{- $maxSurgeSet := include "generic-app-chart.isSet" $maxSurge -}}
+{{- $maxUnavailableSet := include "generic-app-chart.isSet" $maxUnavailable -}}
+{{- $revisionHistoryLimitSet := include "generic-app-chart.isSet" .Values.revisionHistoryLimit -}}
+{{- $minReadySecondsSet := include "generic-app-chart.isSet" .Values.minReadySeconds -}}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -32,9 +82,29 @@ spec:
   {{- end }}
   {{- if .Values.persistence.enabled }}
   # R19: Recreate (not RollingUpdate) so the old pod detaches the RWO volume
-  # before the new one attaches it.
+  # before the new one attaches it. Wins over any configured updateStrategy
+  # (R41) below.
   strategy:
     type: Recreate
+  {{- else if or $maxSurgeSet $maxUnavailableSet }}
+  # R41: configurable RollingUpdate surge/unavailable bounds.
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      {{- if $maxSurgeSet }}
+      maxSurge: {{ $maxSurge }}
+      {{- end }}
+      {{- if $maxUnavailableSet }}
+      maxUnavailable: {{ $maxUnavailable }}
+      {{- end }}
+  {{- end }}
+  {{- if $revisionHistoryLimitSet }}
+  # R41: bounds retained old ReplicaSets for rollback.
+  revisionHistoryLimit: {{ .Values.revisionHistoryLimit }}
+  {{- end }}
+  {{- if $minReadySecondsSet }}
+  # R41: minimum ready time before a new pod counts as available.
+  minReadySeconds: {{ .Values.minReadySeconds }}
   {{- end }}
   selector:
     matchLabels:

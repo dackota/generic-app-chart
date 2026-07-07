@@ -70,6 +70,20 @@ startupProbe: {}
 # Ignored (forced to 1) when persistence.enabled — see R19 in deployment.yaml.
 replicaCount: 1
 
+# R41: bounds how many old ReplicaSets Kubernetes retains for rollback;
+# omitted (cluster default of 10 applies) when unset.
+revisionHistoryLimit: ""
+
+# R41: minimum seconds a new pod must run without crashing before it counts
+# as available; omitted (defaults to 0) when unset.
+minReadySeconds: ""
+
+# R41: configurable RollingUpdate bounds. Ignored — the Deployment stays
+# `strategy: Recreate` — whenever persistence.enabled (R19 always wins).
+updateStrategy:
+  maxSurge: ""
+  maxUnavailable: ""
+
 # R13: no pod automatically mounts its ServiceAccount token unless opted in.
 automountServiceAccountToken: false
 
