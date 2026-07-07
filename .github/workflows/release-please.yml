@@ -1,0 +1,23 @@
+name: release-please
+
+# Drives R30: opens/updates a release PR on every push to main, bumping
+# Chart.yaml's version (release-type: helm) per release-please-config.json.
+# Merging that PR tags the release, which triggers .github/workflows/release.yml
+# to publish the chart to GHCR.
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: googleapis/release-please-action@v4
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
