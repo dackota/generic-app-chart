@@ -4,7 +4,7 @@ description: >-
   A reusable, security-hardened Helm chart for deploying personal apps on a
   home-lab Kubernetes cluster (Oracle free-tier OKE, GitOps via ArgoCD).
 type: application
-version: 0.2.0
+version: 0.3.0
 appVersion: "1.0.0"
 # R29: minimum cluster version this chart targets. See README "Prerequisites"
 # for the CRDs/capabilities (Gateway API, cert-manager, Longhorn, metrics-server)
