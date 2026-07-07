@@ -1,0 +1,24 @@
+# M6 config (configmap.yaml) — R16, R17.
+suite: generic-app-chart ConfigMap (M6)
+templates:
+  - configmap.yaml
+tests:
+  - it: renders a ConfigMap from values config data
+    set:
+      config:
+        LOG_LEVEL: debug
+        FEATURE_X: "true"
+    asserts:
+      - isKind:
+          of: ConfigMap
+      - equal:
+          path: data.LOG_LEVEL
+          value: debug
+      - equal:
+          path: data.FEATURE_X
+          value: "true"
+
+  - it: renders no ConfigMap when no config data is set
+    asserts:
+      - hasDocuments:
+          count: 0

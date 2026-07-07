@@ -1,0 +1,284 @@
+# M2 security defaults (_security.tpl) — R9, R10, R11, R12, R13.
+# Strict, opt-out: restricted-PSA-compliant defaults ship on; each field is
+# independently overridable without disabling the others (R12, asserted below
+# as a per-field opt-out invariant — one override must never disturb a
+# sibling field's default).
+suite: generic-app-chart security defaults (M2)
+templates:
+  - deployment.yaml
+tests:
+  - it: sets pod-level security defaults
+    asserts:
+      - equal:
+          path: spec.template.spec.securityContext.runAsNonRoot
+          value: true
+      - equal:
+          path: spec.template.spec.securityContext.runAsUser
+          value: 10001
+      - equal:
+          path: spec.template.spec.securityContext.runAsGroup
+          value: 10001
+      - equal:
+          path: spec.template.spec.securityContext.fsGroup
+          value: 10001
+      - equal:
+          path: spec.template.spec.securityContext.seccompProfile.type
+          value: RuntimeDefault
+
+  - it: sets container-level security defaults
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.allowPrivilegeEscalation
+          value: false
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.readOnlyRootFilesystem
+          value: true
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.privileged
+          value: false
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.capabilities.drop
+          value: ["ALL"]
+
+  # R12 property test: the opt-out merge is per-field, not all-or-nothing.
+  # Exhaustively exercise every pod- and container-level default field: for
+  # each one, overriding it alone must leave every sibling field's default
+  # untouched. One violation here would silently weaken every future app's
+  # security posture, so each field gets its own case rather than one example.
+  - it: overriding runAsUser alone leaves every other pod-level default intact
+    set:
+      podSecurityContext:
+        runAsUser: 5000
+    asserts:
+      - equal:
+          path: spec.template.spec.securityContext.runAsUser
+          value: 5000
+      - equal:
+          path: spec.template.spec.securityContext.runAsNonRoot
+          value: true
+      - equal:
+          path: spec.template.spec.securityContext.runAsGroup
+          value: 10001
+      - equal:
+          path: spec.template.spec.securityContext.fsGroup
+          value: 10001
+      - equal:
+          path: spec.template.spec.securityContext.seccompProfile.type
+          value: RuntimeDefault
+
+  - it: overriding runAsGroup alone leaves every other pod-level default intact
+    set:
+      podSecurityContext:
+        runAsGroup: 5000
+    asserts:
+      - equal:
+          path: spec.template.spec.securityContext.runAsGroup
+          value: 5000
+      - equal:
+          path: spec.template.spec.securityContext.runAsNonRoot
+          value: true
+      - equal:
+          path: spec.template.spec.securityContext.runAsUser
+          value: 10001
+      - equal:
+          path: spec.template.spec.securityContext.fsGroup
+          value: 10001
+      - equal:
+          path: spec.template.spec.securityContext.seccompProfile.type
+          value: RuntimeDefault
+
+  - it: overriding fsGroup alone leaves every other pod-level default intact
+    set:
+      podSecurityContext:
+        fsGroup: 5000
+    asserts:
+      - equal:
+          path: spec.template.spec.securityContext.fsGroup
+          value: 5000
+      - equal:
+          path: spec.template.spec.securityContext.runAsNonRoot
+          value: true
+      - equal:
+          path: spec.template.spec.securityContext.runAsUser
+          value: 10001
+      - equal:
+          path: spec.template.spec.securityContext.runAsGroup
+          value: 10001
+      - equal:
+          path: spec.template.spec.securityContext.seccompProfile.type
+          value: RuntimeDefault
+
+  - it: overriding runAsNonRoot alone leaves every other pod-level default intact
+    set:
+      podSecurityContext:
+        runAsNonRoot: false
+    asserts:
+      - equal:
+          path: spec.template.spec.securityContext.runAsNonRoot
+          value: false
+      - equal:
+          path: spec.template.spec.securityContext.runAsUser
+          value: 10001
+      - equal:
+          path: spec.template.spec.securityContext.runAsGroup
+          value: 10001
+      - equal:
+          path: spec.template.spec.securityContext.fsGroup
+          value: 10001
+      - equal:
+          path: spec.template.spec.securityContext.seccompProfile.type
+          value: RuntimeDefault
+
+  - it: overriding seccompProfile alone leaves every other pod-level default intact
+    set:
+      podSecurityContext:
+        seccompProfile:
+          type: Unconfined
+    asserts:
+      - equal:
+          path: spec.template.spec.securityContext.seccompProfile.type
+          value: Unconfined
+      - equal:
+          path: spec.template.spec.securityContext.runAsNonRoot
+          value: true
+      - equal:
+          path: spec.template.spec.securityContext.runAsUser
+          value: 10001
+      - equal:
+          path: spec.template.spec.securityContext.runAsGroup
+          value: 10001
+      - equal:
+          path: spec.template.spec.securityContext.fsGroup
+          value: 10001
+
+  - it: overriding allowPrivilegeEscalation alone leaves every other container-level default intact
+    set:
+      containerSecurityContext:
+        allowPrivilegeEscalation: true
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.allowPrivilegeEscalation
+          value: true
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.readOnlyRootFilesystem
+          value: true
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.privileged
+          value: false
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.capabilities.drop
+          value: ["ALL"]
+
+  - it: overriding readOnlyRootFilesystem alone leaves every other container-level default intact
+    set:
+      containerSecurityContext:
+        readOnlyRootFilesystem: false
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.readOnlyRootFilesystem
+          value: false
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.allowPrivilegeEscalation
+          value: false
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.privileged
+          value: false
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.capabilities.drop
+          value: ["ALL"]
+
+  - it: overriding privileged alone leaves every other container-level default intact
+    set:
+      containerSecurityContext:
+        privileged: true
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.privileged
+          value: true
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.allowPrivilegeEscalation
+          value: false
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.readOnlyRootFilesystem
+          value: true
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.capabilities.drop
+          value: ["ALL"]
+
+  - it: adding a capability back alone leaves the drop-ALL default and every other container-level field intact
+    set:
+      containerSecurityContext:
+        capabilities:
+          add: ["NET_BIND_SERVICE"]
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.capabilities.add
+          value: ["NET_BIND_SERVICE"]
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.capabilities.drop
+          value: ["ALL"]
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.allowPrivilegeEscalation
+          value: false
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.readOnlyRootFilesystem
+          value: true
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.privileged
+          value: false
+
+  - it: defaults automountServiceAccountToken to false (R13)
+    asserts:
+      - equal:
+          path: spec.template.spec.automountServiceAccountToken
+          value: false
+
+  - it: allows overriding automountServiceAccountToken per app (R13)
+    set:
+      automountServiceAccountToken: true
+    asserts:
+      - equal:
+          path: spec.template.spec.automountServiceAccountToken
+          value: true
+
+  - it: auto-mounts a writable /tmp emptyDir when readOnlyRootFilesystem is true (R11)
+    asserts:
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: tmp
+            emptyDir: {}
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: tmp
+            mountPath: /tmp
+
+  - it: omits the auto /tmp emptyDir when readOnlyRootFilesystem is overridden to false (R11, R12)
+    set:
+      containerSecurityContext:
+        readOnlyRootFilesystem: false
+    asserts:
+      - notContains:
+          path: spec.template.spec.volumes
+          content:
+            name: tmp
+            emptyDir: {}
+          any: true
+
+  - it: supports additional writable emptyDir mounts via values (R11)
+    set:
+      extraEmptyDirs:
+        - name: cache
+          mountPath: /var/cache/app
+    asserts:
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: cache
+            emptyDir: {}
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: cache
+            mountPath: /var/cache/app
