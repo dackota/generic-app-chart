@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0](https://github.com/dackota/generic-app-chart/compare/v0.3.1...v0.4.0) (2026-07-07)
+
+
+### Features
+
+* R36-R44 production-readiness hardening (7 slices) ([#9](https://github.com/dackota/generic-app-chart/issues/9)) ([9476e2f](https://github.com/dackota/generic-app-chart/commit/9476e2f01c3c7a33505e5e2cbf171c0df6388326))
+
 ## [0.3.1](https://github.com/dackota/generic-app-chart/compare/v0.3.0...v0.3.1) (2026-07-07)
 
 
