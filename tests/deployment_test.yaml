@@ -1,5 +1,5 @@
-# M3 workload (deployment.yaml) — R1, R3-R8, R13, R36-R44.
-suite: generic-app-chart Deployment (M3 workload)
+# Workload (deployment.yaml).
+suite: generic-app-chart Deployment
 templates:
   - deployment.yaml
   - configmap.yaml
@@ -35,7 +35,7 @@ tests:
           path: spec.template.spec.containers[0].imagePullPolicy
           value: Always
 
-  - it: omits command and args when unset (R3)
+  - it: omits command and args when unset
     template: deployment.yaml
     asserts:
       - notExists:
@@ -43,7 +43,7 @@ tests:
       - notExists:
           path: spec.template.spec.containers[0].args
 
-  - it: renders command and args when set via values (R3)
+  - it: renders command and args when set via values
     template: deployment.yaml
     set:
       command: ["/bin/sh"]
@@ -56,7 +56,7 @@ tests:
           path: spec.template.spec.containers[0].args
           value: ["-c", "echo hi"]
 
-  - it: renders plain environment variables from values (R4)
+  - it: renders plain environment variables from values
     template: deployment.yaml
     set:
       env:
@@ -73,7 +73,7 @@ tests:
             - name: PORT
               value: "8080"
 
-  - it: renders individual env entries sourced from secretKeyRef/configMapKeyRef (R6)
+  - it: renders individual env entries sourced from secretKeyRef/configMapKeyRef
     template: deployment.yaml
     set:
       env:
@@ -98,7 +98,7 @@ tests:
           path: spec.template.spec.containers[0].env[1].valueFrom.configMapKeyRef.name
           value: existing-feature-config
 
-  - it: renders envFrom entries referencing existing secretRef/configMapRef by name (R5)
+  - it: renders envFrom entries referencing existing secretRef/configMapRef by name
     template: deployment.yaml
     set:
       envFrom:
@@ -122,7 +122,7 @@ tests:
       - notExists:
           path: spec.template.spec.containers[0].envFrom
 
-  - it: omits liveness and startup probes when unset, never defaulting them (R36)
+  - it: omits liveness and startup probes when unset, never defaulting them
     template: deployment.yaml
     asserts:
       - notExists:
@@ -130,7 +130,7 @@ tests:
       - notExists:
           path: spec.template.spec.containers[0].startupProbe
 
-  - it: defaults readinessProbe to a tcpSocket check on the primary service port when unset (R36)
+  - it: defaults readinessProbe to a tcpSocket check on the primary service port when unset
     template: deployment.yaml
     asserts:
       - equal:
@@ -139,7 +139,7 @@ tests:
       - notExists:
           path: spec.template.spec.containers[0].readinessProbe.httpGet
 
-  - it: renders an http liveness probe when defined (R7)
+  - it: renders an http liveness probe when defined
     template: deployment.yaml
     set:
       livenessProbe:
@@ -155,7 +155,7 @@ tests:
           path: spec.template.spec.containers[0].livenessProbe.initialDelaySeconds
           value: 5
 
-  - it: renders a tcp readiness probe when defined (R7)
+  - it: renders a tcp readiness probe when defined
     template: deployment.yaml
     set:
       readinessProbe:
@@ -166,7 +166,7 @@ tests:
           path: spec.template.spec.containers[0].readinessProbe.tcpSocket.port
           value: 8080
 
-  - it: renders an exec startup probe when defined (R7)
+  - it: renders an exec startup probe when defined
     template: deployment.yaml
     set:
       startupProbe:
@@ -177,7 +177,7 @@ tests:
           path: spec.template.spec.containers[0].startupProbe.exec.command
           value: ["cat", "/tmp/ready"]
 
-  - it: renders an httpGet probe from the path/port shorthand (R36)
+  - it: renders an httpGet probe from the path/port shorthand
     template: deployment.yaml
     set:
       livenessProbe:
@@ -193,7 +193,7 @@ tests:
       - notExists:
           path: spec.template.spec.containers[0].livenessProbe.tcpSocket
 
-  - it: renders a tcpSocket probe from the port-only shorthand (R36)
+  - it: renders a tcpSocket probe from the port-only shorthand
     template: deployment.yaml
     set:
       startupProbe:
@@ -205,7 +205,7 @@ tests:
       - notExists:
           path: spec.template.spec.containers[0].startupProbe.httpGet
 
-  - it: passes extra native Probe fields through the shorthand (R36)
+  - it: passes extra native Probe fields through the shorthand
     template: deployment.yaml
     set:
       readinessProbe:
@@ -220,7 +220,7 @@ tests:
           path: spec.template.spec.containers[0].readinessProbe.initialDelaySeconds
           value: 3
 
-  - it: a shorthand readinessProbe overrides the default tcpSocket probe (R36)
+  - it: a shorthand readinessProbe overrides the default tcpSocket probe
     template: deployment.yaml
     set:
       readinessProbe:
@@ -233,7 +233,7 @@ tests:
       - notExists:
           path: spec.template.spec.containers[0].readinessProbe.tcpSocket
 
-  - it: a raw native readinessProbe block overrides the default tcpSocket probe (R36)
+  - it: a raw native readinessProbe block overrides the default tcpSocket probe
     template: deployment.yaml
     set:
       readinessProbe:
@@ -313,7 +313,7 @@ tests:
       - failedTemplate:
           errorMessage: "generic-app-chart: readinessProbe has no port to probe — set service.ports or the probe's own port field"
 
-  - it: configuring probes never alters the security context or other pod fields (R36)
+  - it: configuring probes never alters the security context or other pod fields
     template: deployment.yaml
     set:
       livenessProbe:
@@ -338,7 +338,7 @@ tests:
           path: spec.template.spec.serviceAccountName
           value: RELEASE-NAME-generic-app-chart
 
-  - it: always sets sane default resource requests and limits (R8)
+  - it: always sets sane default resource requests and limits
     template: deployment.yaml
     asserts:
       - equal:
@@ -354,7 +354,7 @@ tests:
           path: spec.template.spec.containers[0].resources.limits.memory
           value: 256Mi
 
-  - it: allows fully overriding resources via values (R8)
+  - it: allows fully overriding resources via values
     template: deployment.yaml
     set:
       resources:
@@ -372,7 +372,7 @@ tests:
           path: spec.template.spec.containers[0].resources.limits.memory
           value: 1Gi
 
-  - it: references the chart's ServiceAccount from the pod spec (R14)
+  - it: references the chart's ServiceAccount from the pod spec
     template: deployment.yaml
     release:
       name: my-app
@@ -381,7 +381,7 @@ tests:
           path: spec.template.spec.serviceAccountName
           value: my-app-generic-app-chart
 
-  - it: references an overridden ServiceAccount name from the pod spec (R14)
+  - it: references an overridden ServiceAccount name from the pod spec
     template: deployment.yaml
     set:
       serviceAccount.name: custom-sa
@@ -390,7 +390,7 @@ tests:
           path: spec.template.spec.serviceAccountName
           value: custom-sa
 
-  - it: maps declared service ports onto the container's ports (R15)
+  - it: maps declared service ports onto the container's ports
     template: deployment.yaml
     set:
       service.ports:
@@ -415,7 +415,7 @@ tests:
           path: spec.template.spec.containers[0].ports[1].containerPort
           value: 9090
 
-  - it: adds a config checksum annotation to the pod template when config is set (R17)
+  - it: adds a config checksum annotation to the pod template when config is set
     template: deployment.yaml
     set:
       config:
@@ -431,7 +431,7 @@ tests:
       - notExists:
           path: spec.template.metadata.annotations
 
-  # Golden-value pair (R17): independently rendered once via `helm template
+  # Golden-value pair: independently rendered once via `helm template
   # myrelease . --set config.LOG_LEVEL=<value> -s templates/deployment.yaml`
   # and pinned here. Proves the checksum is sensitive to config content (i.e.
   # editing config actually changes the annotation and so triggers a
@@ -448,13 +448,13 @@ tests:
           path: spec.template.metadata.annotations["checksum/config"]
           value: 5dca1b4971fcf24f18b601f3ea7006249acb16174bd63afaf610e21e07b4bccf
 
-  - it: omits nodeSelector when unset (R38)
+  - it: omits nodeSelector when unset
     template: deployment.yaml
     asserts:
       - notExists:
           path: spec.template.spec.nodeSelector
 
-  - it: renders nodeSelector verbatim when set (R38)
+  - it: renders nodeSelector verbatim when set
     template: deployment.yaml
     set:
       nodeSelector:
@@ -467,13 +467,13 @@ tests:
             disktype: ssd
             kubernetes.io/arch: amd64
 
-  - it: omits tolerations when unset (R38)
+  - it: omits tolerations when unset
     template: deployment.yaml
     asserts:
       - notExists:
           path: spec.template.spec.tolerations
 
-  - it: renders tolerations verbatim when set (R38)
+  - it: renders tolerations verbatim when set
     template: deployment.yaml
     set:
       tolerations:
@@ -490,13 +490,13 @@ tests:
               value: gpu
               effect: NoSchedule
 
-  - it: omits priorityClassName when unset (R38)
+  - it: omits priorityClassName when unset
     template: deployment.yaml
     asserts:
       - notExists:
           path: spec.template.spec.priorityClassName
 
-  - it: renders priorityClassName when set (R38)
+  - it: renders priorityClassName when set
     template: deployment.yaml
     set:
       priorityClassName: high-priority
@@ -505,13 +505,13 @@ tests:
           path: spec.template.spec.priorityClassName
           value: high-priority
 
-  - it: omits topologySpreadConstraints when unset (R38)
+  - it: omits topologySpreadConstraints when unset
     template: deployment.yaml
     asserts:
       - notExists:
           path: spec.template.spec.topologySpreadConstraints
 
-  - it: renders topologySpreadConstraints verbatim when set (R38)
+  - it: renders topologySpreadConstraints verbatim when set
     template: deployment.yaml
     set:
       topologySpreadConstraints:
@@ -532,13 +532,13 @@ tests:
                 matchLabels:
                   app.kubernetes.io/name: generic-app-chart
 
-  - it: omits affinity when unset and replicaCount is 1 (R38)
+  - it: omits affinity when unset and replicaCount is 1
     template: deployment.yaml
     asserts:
       - notExists:
           path: spec.template.spec.affinity
 
-  - it: renders a custom affinity verbatim when set, even with replicaCount > 1 (R38)
+  - it: renders a custom affinity verbatim when set, even with replicaCount > 1
     template: deployment.yaml
     set:
       replicaCount: 3
@@ -562,7 +562,7 @@ tests:
                         operator: In
                         values: ["amd64"]
 
-  - it: injects a default preferred pod anti-affinity across hostname when replicaCount > 1 and no affinity is set (R38)
+  - it: injects a default preferred pod anti-affinity across hostname when replicaCount > 1 and no affinity is set
     template: deployment.yaml
     release:
       name: my-app
@@ -584,7 +584,7 @@ tests:
       - notExists:
           path: spec.template.spec.affinity.podAntiAffinity.requiredDuringSchedulingIgnoredDuringExecution
 
-  - it: does not inject the default anti-affinity when a custom affinity is supplied, even with replicaCount > 1 (R38)
+  - it: does not inject the default anti-affinity when a custom affinity is supplied, even with replicaCount > 1
     template: deployment.yaml
     set:
       replicaCount: 3
@@ -594,7 +594,7 @@ tests:
       - notExists:
           path: spec.template.spec.affinity.podAntiAffinity
 
-  - it: does not inject a default anti-affinity when replicaCount <= 1 (R38)
+  - it: does not inject a default anti-affinity when replicaCount <= 1
     template: deployment.yaml
     set:
       replicaCount: 1
@@ -602,7 +602,7 @@ tests:
       - notExists:
           path: spec.template.spec.affinity
 
-  - it: injects the default anti-affinity from autoscaling's minReplicas floor even when replicaCount is left at its default of 1 (R38/R44)
+  - it: injects the default anti-affinity from autoscaling's minReplicas floor even when replicaCount is left at its default of 1
     template: deployment.yaml
     release:
       name: my-app
@@ -618,7 +618,7 @@ tests:
           path: spec.template.spec.affinity.podAntiAffinity.preferredDuringSchedulingIgnoredDuringExecution[0].podAffinityTerm.topologyKey
           value: kubernetes.io/hostname
 
-  - it: does not inject a default anti-affinity when autoscaling's minReplicas is 1, even though autoscaling is enabled (R38/R44)
+  - it: does not inject a default anti-affinity when autoscaling's minReplicas is 1, even though autoscaling is enabled
     template: deployment.yaml
     set:
       autoscaling:
@@ -628,7 +628,7 @@ tests:
       - notExists:
           path: spec.template.spec.affinity
 
-  - it: changes the checksum when config content changes (R17)
+  - it: changes the checksum when config content changes
     template: deployment.yaml
     release:
       name: myrelease
@@ -643,8 +643,8 @@ tests:
           path: spec.template.metadata.annotations["checksum/config"]
           value: 5dca1b4971fcf24f18b601f3ea7006249acb16174bd63afaf610e21e07b4bccf
 
-  # R39 generic metadata passthrough.
-  - it: adds commonAnnotations to the Deployment's own metadata (R39)
+  # Generic metadata passthrough.
+  - it: adds commonAnnotations to the Deployment's own metadata
     template: deployment.yaml
     set:
       commonAnnotations:
@@ -654,7 +654,7 @@ tests:
           path: metadata.annotations["team"]
           value: platform
 
-  - it: adds podLabels to the pod template merged with chart-managed pod labels, dropping none (R39)
+  - it: adds podLabels to the pod template merged with chart-managed pod labels, dropping none
     template: deployment.yaml
     release:
       name: my-app
@@ -672,9 +672,9 @@ tests:
           path: spec.template.metadata.labels["app.kubernetes.io/instance"]
           value: my-app
 
-  # R39 property test: podLabels must never clobber the chart-managed pod
+  # Property test: podLabels must never clobber the chart-managed pod
   # labels that the Deployment's own selector depends on.
-  - it: never lets podLabels override chart-managed pod label keys (R39)
+  - it: never lets podLabels override chart-managed pod label keys
     template: deployment.yaml
     release:
       name: my-app
@@ -690,10 +690,10 @@ tests:
           path: spec.template.metadata.labels["app.kubernetes.io/instance"]
           value: my-app
 
-  # R39 regression: podLabels is the more specific source and must win over
+  # Regression: podLabels is the more specific source and must win over
   # commonLabels for the same non-reserved key on the pod template — the
   # opposite precedence would silently discard a user's pod-specific override.
-  - it: lets podLabels win over commonLabels for the same key on the pod template (R39)
+  - it: lets podLabels win over commonLabels for the same key on the pod template
     template: deployment.yaml
     release:
       name: my-app
@@ -707,7 +707,7 @@ tests:
           path: spec.template.metadata.labels["team"]
           value: from-pod
 
-  - it: still lets commonLabels reach the pod template when podLabels does not set that key (R39)
+  - it: still lets commonLabels reach the pod template when podLabels does not set that key
     template: deployment.yaml
     release:
       name: my-app
@@ -719,7 +719,7 @@ tests:
           path: spec.template.metadata.labels["team"]
           value: from-common
 
-  - it: adds podAnnotations to the pod template without dropping the checksum/config annotation (R39, R17)
+  - it: adds podAnnotations to the pod template without dropping the checksum/config annotation
     template: deployment.yaml
     set:
       config:
@@ -734,7 +734,7 @@ tests:
           path: spec.template.metadata.annotations["checksum/config"]
           pattern: "^[0-9a-f]{64}$"
 
-  - it: renders podAnnotations on the pod template even when no config is set (R39)
+  - it: renders podAnnotations on the pod template even when no config is set
     template: deployment.yaml
     set:
       podAnnotations:
@@ -746,11 +746,11 @@ tests:
       - notExists:
           path: spec.template.metadata.annotations["checksum/config"]
 
-  # R39 property test: podAnnotations/commonAnnotations must never be able to
+  # Property test: podAnnotations/commonAnnotations must never be able to
   # override the checksum/config annotation that drives the config-rollout
-  # trigger (R17) — a clobbered checksum would silently stop pods from
+  # trigger — a clobbered checksum would silently stop pods from
   # restarting on config changes.
-  - it: never lets podAnnotations override the checksum/config annotation (R39, R17)
+  - it: never lets podAnnotations override the checksum/config annotation
     template: deployment.yaml
     set:
       config:
@@ -762,7 +762,7 @@ tests:
           path: spec.template.metadata.annotations["checksum/config"]
           pattern: "^[0-9a-f]{64}$"
 
-  - it: never lets commonAnnotations override the checksum/config annotation (R39, R17)
+  - it: never lets commonAnnotations override the checksum/config annotation
     template: deployment.yaml
     set:
       config:
@@ -774,7 +774,7 @@ tests:
           path: spec.template.metadata.annotations["checksum/config"]
           pattern: "^[0-9a-f]{64}$"
 
-  - it: merges commonAnnotations into the pod template alongside podAnnotations (R39)
+  - it: merges commonAnnotations into the pod template alongside podAnnotations
     template: deployment.yaml
     set:
       commonAnnotations:
@@ -789,15 +789,15 @@ tests:
           path: spec.template.metadata.annotations["vault.hashicorp.com/agent-inject"]
           value: "true"
 
-  # R40 observability surface: Prometheus scrape annotations, rendered via
-  # the R39 podAnnotations mechanism.
-  - it: omits Prometheus scrape annotations when metrics.scrape is disabled by default (R40)
+  # Observability surface: Prometheus scrape annotations, rendered via
+  # the podAnnotations mechanism.
+  - it: omits Prometheus scrape annotations when metrics.scrape is disabled by default
     template: deployment.yaml
     asserts:
       - notExists:
           path: spec.template.metadata.annotations["prometheus.io/scrape"]
 
-  - it: renders prometheus.io/scrape|port|path pod annotations when metrics.scrape is enabled (R40)
+  - it: renders prometheus.io/scrape|port|path pod annotations when metrics.scrape is enabled
     template: deployment.yaml
     set:
       metrics:
@@ -816,7 +816,7 @@ tests:
           path: spec.template.metadata.annotations["prometheus.io/path"]
           value: /custom-metrics
 
-  - it: merges scrape annotations with existing podAnnotations/commonAnnotations without dropping either (R40, R39)
+  - it: merges scrape annotations with existing podAnnotations/commonAnnotations without dropping either
     template: deployment.yaml
     set:
       metrics:
@@ -837,11 +837,11 @@ tests:
           path: spec.template.metadata.annotations["vault.hashicorp.com/agent-inject"]
           value: "true"
 
-  # R40 property test: the metrics block must never panic the render when a
+  # Property test: the metrics block must never panic the render when a
   # caller explicitly nulls it out or an intermediate key (the
   # "nulled-intermediate-key" bug class) — the chart must fall back to its
   # off-by-default behavior instead of crashing.
-  - it: never panics and stays off by default when metrics is explicitly nulled (R40 robustness)
+  - it: never panics and stays off by default when metrics is explicitly nulled (robustness)
     template: deployment.yaml
     set:
       metrics: null
@@ -849,7 +849,7 @@ tests:
       - notExists:
           path: spec.template.metadata.annotations["prometheus.io/scrape"]
 
-  - it: never panics and stays off by default when metrics.scrape is explicitly nulled (R40 robustness)
+  - it: never panics and stays off by default when metrics.scrape is explicitly nulled (robustness)
     template: deployment.yaml
     set:
       metrics:
@@ -857,7 +857,7 @@ tests:
     asserts:
       - notExists:
           path: spec.template.metadata.annotations["prometheus.io/scrape"]
-  - it: renders imagePullSecrets on the pod spec when set (R42)
+  - it: renders imagePullSecrets on the pod spec when set
     template: deployment.yaml
     set:
       imagePullSecrets:
@@ -870,13 +870,13 @@ tests:
             - name: existing-registry-secret
             - name: another-registry-secret
 
-  - it: omits imagePullSecrets from the pod spec when unset (R42)
+  - it: omits imagePullSecrets from the pod spec when unset
     template: deployment.yaml
     asserts:
       - notExists:
           path: spec.template.spec.imagePullSecrets
 
-  - it: renders extraVolumes/extraVolumeMounts on the pod and container, coexisting with the auto /tmp mount (R11, R43)
+  - it: renders extraVolumes/extraVolumeMounts on the pod and container, coexisting with the auto /tmp mount
     template: deployment.yaml
     set:
       extraVolumes:
@@ -911,7 +911,7 @@ tests:
             name: tmp
             mountPath: /tmp
 
-  - it: coexists with extraEmptyDirs and the persistence PVC when all are set together (R11, R18, R43)
+  - it: coexists with extraEmptyDirs and the persistence PVC when all are set together
     template: deployment.yaml
     release:
       name: my-app
@@ -974,14 +974,14 @@ tests:
             name: tls-certs
             mountPath: /etc/tls
             readOnly: true
-  - it: defaults terminationGracePeriodSeconds to 30 on the pod spec (R37)
+  - it: defaults terminationGracePeriodSeconds to 30 on the pod spec
     template: deployment.yaml
     asserts:
       - equal:
           path: spec.template.spec.terminationGracePeriodSeconds
           value: 30
 
-  - it: renders an overridden terminationGracePeriodSeconds on the pod spec (R37)
+  - it: renders an overridden terminationGracePeriodSeconds on the pod spec
     template: deployment.yaml
     set:
       terminationGracePeriodSeconds: 90
@@ -990,13 +990,13 @@ tests:
           path: spec.template.spec.terminationGracePeriodSeconds
           value: 90
 
-  - it: omits the lifecycle block when no preStop is configured (R37)
+  - it: omits the lifecycle block when no preStop is configured
     template: deployment.yaml
     asserts:
       - notExists:
           path: spec.template.spec.containers[0].lifecycle
 
-  - it: renders a preStop sleep-drain shorthand as a container lifecycle exec sleep (R37)
+  - it: renders a preStop sleep-drain shorthand as a container lifecycle exec sleep
     template: deployment.yaml
     set:
       preStop:
@@ -1006,7 +1006,7 @@ tests:
           path: spec.template.spec.containers[0].lifecycle.preStop.exec.command
           value: ["/bin/sh", "-c", "sleep 5"]
 
-  - it: renders the sleep-0 exec command when preStop.sleepSeconds is explicitly 0, not an absent lifecycle block (R37)
+  - it: renders the sleep-0 exec command when preStop.sleepSeconds is explicitly 0, not an absent lifecycle block
     template: deployment.yaml
     set:
       preStop:
@@ -1016,11 +1016,11 @@ tests:
           path: spec.template.spec.containers[0].lifecycle.preStop.exec.command
           value: ["/bin/sh", "-c", "sleep 0"]
 
-  # R37 property test: preStop is an optional map (like metrics, R40) and must
-  # never panic the render when a caller explicitly nulls it out — the chart
-  # must fall back to its off-by-default behavior (no lifecycle block) instead
-  # of crashing on `hasKey` against a nil value.
-  - it: never panics and omits the lifecycle block when preStop is explicitly nulled (R37 robustness)
+  # Property test: preStop is an optional map (like the metrics block) and
+  # must never panic the render when a caller explicitly nulls it out — the
+  # chart must fall back to its off-by-default behavior (no lifecycle block)
+  # instead of crashing on `hasKey` against a nil value.
+  - it: never panics and omits the lifecycle block when preStop is explicitly nulled (robustness)
     template: deployment.yaml
     set:
       preStop: null
@@ -1028,7 +1028,7 @@ tests:
       - notExists:
           path: spec.template.spec.containers[0].lifecycle
 
-  - it: renders a raw lifecycle block verbatim, taking precedence over the sleep shorthand (R37)
+  - it: renders a raw lifecycle block verbatim, taking precedence over the sleep shorthand
     template: deployment.yaml
     set:
       preStop:
@@ -1048,7 +1048,7 @@ tests:
           path: spec.template.spec.containers[0].lifecycle.postStart.exec.command
           value: ["/bin/sh", "-c", "echo starting"]
 
-  - it: omits revisionHistoryLimit and minReadySeconds when unset (R41)
+  - it: omits revisionHistoryLimit and minReadySeconds when unset
     template: deployment.yaml
     asserts:
       - notExists:
@@ -1056,7 +1056,7 @@ tests:
       - notExists:
           path: spec.minReadySeconds
 
-  - it: renders revisionHistoryLimit and minReadySeconds when set (R41)
+  - it: renders revisionHistoryLimit and minReadySeconds when set
     template: deployment.yaml
     set:
       revisionHistoryLimit: 3
@@ -1073,7 +1073,7 @@ tests:
   # (immediate ReplicaSet cleanup / no minimum ready wait) and must not be
   # dropped by falsy-zero truthiness checks — see the maxSurge/maxUnavailable
   # zero-value test below for the sibling case this mirrors.
-  - it: renders revisionHistoryLimit and minReadySeconds when explicitly set to 0 (R41)
+  - it: renders revisionHistoryLimit and minReadySeconds when explicitly set to 0
     template: deployment.yaml
     set:
       revisionHistoryLimit: 0
@@ -1086,7 +1086,7 @@ tests:
           path: spec.minReadySeconds
           value: 0
 
-  - it: renders a configurable RollingUpdate strategy with maxSurge and maxUnavailable when persistence is disabled (R41)
+  - it: renders a configurable RollingUpdate strategy with maxSurge and maxUnavailable when persistence is disabled
     template: deployment.yaml
     set:
       updateStrategy:
@@ -1103,7 +1103,7 @@ tests:
           path: spec.strategy.rollingUpdate.maxUnavailable
           value: 0
 
-  - it: renders only the configured half of the RollingUpdate strategy when just maxSurge is set (R41)
+  - it: renders only the configured half of the RollingUpdate strategy when just maxSurge is set
     template: deployment.yaml
     set:
       updateStrategy:
@@ -1125,10 +1125,10 @@ tests:
   #      "set", because Sprig's toString(nil) is the literal string "<nil>"
   #      (non-empty) — rendering a dangling `key: ` with no value.
   # These three cases together pin that invariant for revisionHistoryLimit;
-  # "omits revisionHistoryLimit and minReadySeconds when unset (R41)" above
-  # covers state 1, "...explicitly set to 0 (R41)" above covers state 2, and
+  # "omits revisionHistoryLimit and minReadySeconds when unset" above
+  # covers state 1, "...explicitly set to 0" above covers state 2, and
   # this test covers state 3.
-  - it: omits revisionHistoryLimit and minReadySeconds when explicitly set to null (R41)
+  - it: omits revisionHistoryLimit and minReadySeconds when explicitly set to null
     template: deployment.yaml
     set:
       revisionHistoryLimit: null
@@ -1146,7 +1146,7 @@ tests:
   # configured half..." above) and explicit-0 (see "renders a configurable
   # RollingUpdate strategy..." above) states were already covered; this adds
   # their third state, closing the same 3-state grid for the sibling fields.
-  - it: omits maxSurge and maxUnavailable from the RollingUpdate strategy when explicitly set to null (R41)
+  - it: omits maxSurge and maxUnavailable from the RollingUpdate strategy when explicitly set to null
     template: deployment.yaml
     set:
       updateStrategy:
@@ -1166,7 +1166,7 @@ tests:
   # access panics evaluating a field on a nil value before isSet ever runs on
   # the result. `dig` must short-circuit through the nil parent instead of
   # dereferencing it.
-  - it: omits the RollingUpdate strategy and does not crash when the updateStrategy parent itself is set to null (R41)
+  - it: omits the RollingUpdate strategy and does not crash when the updateStrategy parent itself is set to null
     template: deployment.yaml
     set:
       updateStrategy: null

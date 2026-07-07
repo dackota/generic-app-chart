@@ -1,11 +1,11 @@
 {{/*
-M1 generic metadata passthrough — R39.
+Generic metadata passthrough.
 
 podAnnotations/podLabels (pod template only), commonLabels/commonAnnotations
 (every rendered resource), and serviceAnnotations (Service only), all merged
 with — and always overridden by — this chart's managed labels/annotations:
-selector labels (_helpers.tpl) and the checksum/config annotation (R17,
-configmap.yaml/deployment.yaml). commonLabels already flows into every
+selector labels (_helpers.tpl) and the checksum/config annotation
+(configmap.yaml/deployment.yaml). commonLabels already flows into every
 resource's own metadata.labels through generic-app-chart.labels itself
 (_helpers.tpl); the pod-template labels below re-merge commonLabels against
 the raw chart-managed set directly (not through generic-app-chart.labels) so
@@ -45,7 +45,7 @@ beat podLabels for the same key, backwards from the intended precedence.
 {{- end }}
 
 {{/*
-Prometheus scrape annotations (R40): prometheus.io/scrape|port|path,
+Prometheus scrape annotations: prometheus.io/scrape|port|path,
 rendered only when .Values.metrics.scrape.enabled. Guards against the
 "nulled-intermediate-key" panic class by defaulting .Values.metrics and its
 .scrape sub-key to an empty dict before reading .enabled/.port/.path, so an
@@ -68,8 +68,8 @@ prometheus.io/path: {{ $scrape.path | quote }}
 
 {{/*
 Pod template annotations: .Values.commonAnnotations and .Values.podAnnotations
-merged with the chart-managed checksum/config annotation (R17), which is only
-present when .Values.config is set, and the R40 scrape annotations above,
+merged with the chart-managed checksum/config annotation, which is only
+present when .Values.config is set, and the scrape annotations above,
 which are only present when .Values.metrics.scrape.enabled. Both
 chart-derived annotation sets always win on conflict — checksum/config is
 what forces a rollout when config data changes, and the scrape annotations
@@ -121,7 +121,7 @@ the more specific of the two — wins on conflict rather than being dropped.
 
 {{/*
 ServiceAccount metadata.annotations: .Values.commonAnnotations merged with
-.Values.serviceAccount.annotations (R14), the latter — the more specific of
+.Values.serviceAccount.annotations, the latter — the more specific of
 the two — winning on conflict.
 */}}
 {{- define "generic-app-chart.serviceAccountAnnotations" -}}

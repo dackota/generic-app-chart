@@ -1,9 +1,9 @@
 {{/*
-M8 scaling & disruption — R26/R44. minAvailable/maxUnavailable are mutually
+Scaling & disruption. minAvailable/maxUnavailable are mutually
 exclusive on a PodDisruptionBudget spec — maxUnavailable wins when the caller
 sets it, otherwise minAvailable (which defaults on) applies. Renders only when
 the effective replica count (see the .effectiveReplicaCount helper) is > 1 —
-never under the persistence-forced replicas: 1 (R19) or a single static
+never under the persistence-forced replicas: 1 or a single static
 replica — so the budget can never block every replica from draining at once.
 */}}
 {{- if and .Values.pdb.enabled (gt (include "generic-app-chart.effectiveReplicaCount" . | int) 1) }}

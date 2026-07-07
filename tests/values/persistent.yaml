@@ -1,5 +1,5 @@
-# R31 scenario: persistence enabled — a stateful app (e.g. CTD) that needs an
-# RWO Longhorn volume. Exercises the R19/R20 coupling: Recreate strategy,
+# Scenario: persistence enabled — a stateful app (e.g. CTD) that needs an
+# RWO Longhorn volume. Exercises the persistence/replica-count coupling: Recreate strategy,
 # replicas pinned to 1, no autoscaling.
 image:
   repository: ghcr.io/dackota/change-tracking-dashboard

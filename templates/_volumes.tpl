@@ -1,9 +1,9 @@
 {{/*
-Auxiliary to M2/M4 — the pod's volumes and the container's matching
+Auxiliary to the security defaults and persistence handling — the pod's volumes and the container's matching
 volumeMounts, derived from four sources: the merged container
-securityContext's readOnlyRootFilesystem (R11's automatic /tmp emptyDir),
-values.extraEmptyDirs (R11's additional writable mounts), values.persistence
-(R18), and values.extraVolumes/extraVolumeMounts (R43's arbitrary
+securityContext's readOnlyRootFilesystem (the automatic /tmp emptyDir),
+values.extraEmptyDirs (additional writable mounts), values.persistence,
+and values.extraVolumes/extraVolumeMounts (arbitrary
 pass-through volume sources). Centralized here so deployment.yaml doesn't
 duplicate the "which sources are active" branching once for volumeMounts and
 once for volumes; every source coexists rather than replacing another.

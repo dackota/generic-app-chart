@@ -1,5 +1,5 @@
 {{/*
-M4 persistence — R18. Only rendered when persistence is enabled and the
+Persistence. Only rendered when persistence is enabled and the
 caller hasn't supplied an existingClaim to reuse instead.
 */}}
 {{- if and .Values.persistence.enabled (not .Values.persistence.existingClaim) }}

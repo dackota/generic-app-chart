@@ -217,7 +217,7 @@ helm unittest .
 Suites live under `tests/*_test.yaml` (one per module: naming/labels,
 security defaults, workload, persistence, config, service, serviceaccount,
 HTTPRoute, Certificate, ReferenceGrant, HPA, PDB, NetworkPolicy, ServiceMonitor,
-plus the R28 secret, R12 security opt-out, R24 cluster-only, and R25
+plus the never-renders-a-secret, security opt-out, cluster-only, and
 HPA<->persistence property/invariant suites). Named scenario values files
 live under `tests/values/`:
 

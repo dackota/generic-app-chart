@@ -1,5 +1,5 @@
-# M7 service (service.yaml) — R15.
-suite: generic-app-chart Service (M7)
+# Service (service.yaml).
+suite: generic-app-chart Service
 templates:
   - service.yaml
 tests:
@@ -57,8 +57,8 @@ tests:
           path: spec.selector["app.kubernetes.io/instance"]
           value: my-app
 
-  # R39 generic metadata passthrough.
-  - it: adds serviceAnnotations to the Service (R39)
+  # Generic metadata passthrough.
+  - it: adds serviceAnnotations to the Service
     set:
       serviceAnnotations:
         external-dns.alpha.kubernetes.io/hostname: my-app.dackota.dev
@@ -67,7 +67,7 @@ tests:
           path: metadata.annotations["external-dns.alpha.kubernetes.io/hostname"]
           value: my-app.dackota.dev
 
-  - it: merges commonAnnotations into the Service alongside serviceAnnotations, serviceAnnotations winning on conflict (R39)
+  - it: merges commonAnnotations into the Service alongside serviceAnnotations, serviceAnnotations winning on conflict
     set:
       commonAnnotations:
         team: platform
@@ -82,7 +82,7 @@ tests:
           path: metadata.annotations["external-dns.alpha.kubernetes.io/hostname"]
           value: service-specific-value
 
-  - it: adds commonLabels to the Service (R39)
+  - it: adds commonLabels to the Service
     set:
       commonLabels:
         team: platform

@@ -1,5 +1,5 @@
 {{/*
-M3 workload (deployment.yaml) — R36. Expands one probe's values entry
+Expands one probe's values entry
 (livenessProbe/readinessProbe/startupProbe) into its rendered body, in
 priority order:
 

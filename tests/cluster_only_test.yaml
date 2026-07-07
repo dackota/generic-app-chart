@@ -1,9 +1,9 @@
-# M5 networking — R24 cluster-only mode. Property test: with routing disabled,
+# Networking — cluster-only mode. Property test: with routing disabled,
 # none of the three routing/TLS resources render, while the Service — the
 # thing cluster-only mode still needs — keeps rendering. One test spanning all
 # four templates, rather than one ad hoc "renders no X" case per resource
 # kind, so the whole cluster-only contract is pinned in a single place.
-suite: generic-app-chart cluster-only mode (R24)
+suite: generic-app-chart cluster-only mode
 templates:
   - httproute.yaml
   - certificate.yaml

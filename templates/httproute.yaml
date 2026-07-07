@@ -1,6 +1,6 @@
 {{/*
-M5 networking — R21. Renders the app's route through the lab's one shared
-Gateway; suppressed entirely in cluster-only mode (R24, routing.enabled: false).
+Networking. Renders the app's route through the lab's one shared
+Gateway; suppressed entirely in cluster-only mode (routing.enabled: false).
 */}}
 {{- if .Values.routing.enabled }}
 apiVersion: gateway.networking.k8s.io/v1

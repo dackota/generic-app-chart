@@ -1,8 +1,8 @@
-# R31 scenario: the "everything on" case — routing + TLS through a
+# Scenario: the "everything on" case — routing + TLS through a
 # cross-namespace Gateway (exercising the ReferenceGrant), autoscaling, a PDB,
-# NetworkPolicy, config, imagePullSecrets, and extraVolumes/extraVolumeMounts
-# (R42/R43), all together. Persistence stays disabled since it is mutually
-# exclusive with autoscaling (R20/R25) — that combination (persistence +
+# NetworkPolicy, config, imagePullSecrets, and extraVolumes/extraVolumeMounts,
+# all together. Persistence stays disabled since it is mutually
+# exclusive with autoscaling — that combination (persistence +
 # extraVolumes coexisting with the PVC) is covered by the dedicated
 # deployment_test.yaml coexistence test instead.
 image:
@@ -36,7 +36,7 @@ service:
 config:
   LOG_LEVEL: info
 
-# R40: observability surface, exercised alongside every other feature.
+# Observability surface, exercised alongside every other feature.
 metrics:
   scrape:
     enabled: true
@@ -79,7 +79,7 @@ networkPolicy:
       matchLabels:
         kubernetes.io/metadata.name: traefik
 
-# R39: generic metadata passthrough, exercised alongside every other feature.
+# Generic metadata passthrough, exercised alongside every other feature.
 commonLabels:
   cost-center: ctd
 commonAnnotations:

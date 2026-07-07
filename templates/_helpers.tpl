@@ -1,10 +1,10 @@
 {{/*
-M1 naming/labels — R2.
+Naming/labels.
 
 Every rendered resource derives its name and labels through these helpers so
 naming and labelling stay consistent across the whole chart (Deployment,
-Service, ServiceAccount, ConfigMap, PVC, and whatever the
-networking-operational-addons task adds on top).
+Service, ServiceAccount, ConfigMap, PVC, and every other resource this chart
+renders).
 */}}
 
 {{/*
@@ -55,7 +55,7 @@ podLabels instead.
 {{- end }}
 
 {{/*
-Standard Helm common labels, merged with .Values.commonLabels (R39) so every
+Standard Helm common labels, merged with .Values.commonLabels so every
 resource that renders through this shared helper picks up commonLabels
 automatically, without each template bolting the merge on individually.
 Chart-managed keys (helm.sh/chart, the selector labels, version, managed-by)
@@ -79,13 +79,13 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
 {{/*
-M8 scaling & disruption — R44. The replica count actually in effect once the
-persistence/autoscaling coupling (deployment.yaml) is applied: persistence
-pins it to 1 (R19, a Longhorn RWO volume can only attach to one pod),
-autoscaling floors it at minReplicas (R25, the HPA owns the count from there),
-otherwise the static replicaCount applies. Used to gate the PDB (pdb.yaml) so
-a minAvailable/maxUnavailable budget can never target a single-replica
-workload, which would deadlock a node drain.
+The replica count actually in effect once the persistence/autoscaling
+coupling (deployment.yaml) is applied: persistence pins it to 1 (a Longhorn
+RWO volume can only attach to one pod), autoscaling floors it at minReplicas
+(the HPA owns the count from there), otherwise the static replicaCount
+applies. Used to gate the PDB (pdb.yaml) so a minAvailable/maxUnavailable
+budget can never target a single-replica workload, which would deadlock a
+node drain.
 */}}
 {{- define "generic-app-chart.effectiveReplicaCount" -}}
 {{- if .Values.persistence.enabled -}}
@@ -98,7 +98,7 @@ workload, which would deadlock a node drain.
 {{- end }}
 
 {{/*
-Name of the ServiceAccount the Deployment runs as (R14). When
+Name of the ServiceAccount the Deployment runs as. When
 serviceAccount.create is true (default), this is the dedicated SA this chart
 creates — named after the fullname unless overridden. When false, it
 references an existing SA the caller already created.

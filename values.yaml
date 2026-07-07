@@ -1,7 +1,7 @@
 # Default values for generic-app-chart.
 # This is a YAML-formatted file — see README.md for the full reference.
 
-# R2: derived names default to "<release>-<chart>" (or just "<release>" when
+# Derived names default to "<release>-<chart>" (or just "<release>" when
 # the release name already contains the chart name). Override either to
 # control the name every resource in this chart is rendered under.
 nameOverride: ""
@@ -13,18 +13,18 @@ image:
   tag: ""
   pullPolicy: IfNotPresent
 
-# R42: references existing (referenced) image-pull Secret(s) by name for
+# References existing (referenced) image-pull Secret(s) by name for
 # private-registry pulls — this chart never creates the Secret being
 # referenced here. Omitted from the pod spec entirely when empty.
 #   imagePullSecrets:
 #     - name: existing-registry-secret
 imagePullSecrets: []
 
-# R3: omitted from the container spec when unset.
+# Omitted from the container spec when unset.
 command: []
 args: []
 
-# R4/R6: plain and valueFrom-sourced entries — this is the native Kubernetes
+# Plain and valueFrom-sourced entries — this is the native Kubernetes
 # EnvVar shape, so both forms live in one list:
 #   env:
 #     - name: LOG_LEVEL
@@ -36,7 +36,7 @@ args: []
 #           key: password
 env: []
 
-# R5: references an existing Secret/ConfigMap by name — this chart never
+# References an existing Secret/ConfigMap by name — this chart never
 # creates the Secret/ConfigMap being referenced here.
 #   envFrom:
 #     - secretRef:
@@ -45,7 +45,7 @@ env: []
 #         name: existing-app-config
 envFrom: []
 
-# R7/R36: each of livenessProbe/readinessProbe/startupProbe accepts three
+# Each of livenessProbe/readinessProbe/startupProbe accepts three
 # forms, tried in this order:
 #   1. A raw native Probe block — supports httpGet/tcpSocket/exec/grpc
 #      exactly as the Kubernetes Probe spec does — rendered verbatim,
@@ -67,32 +67,32 @@ livenessProbe: {}
 readinessProbe: {}
 startupProbe: {}
 
-# Ignored (forced to 1) when persistence.enabled — see R19 in deployment.yaml.
+# Ignored (forced to 1) when persistence.enabled — see the persistence handling in deployment.yaml.
 replicaCount: 1
 
-# R41: bounds how many old ReplicaSets Kubernetes retains for rollback;
+# Bounds how many old ReplicaSets Kubernetes retains for rollback;
 # omitted (cluster default of 10 applies) when unset.
 revisionHistoryLimit: ""
 
-# R41: minimum seconds a new pod must run without crashing before it counts
+# Minimum seconds a new pod must run without crashing before it counts
 # as available; omitted (defaults to 0) when unset.
 minReadySeconds: ""
 
-# R41: configurable RollingUpdate bounds. Ignored — the Deployment stays
-# `strategy: Recreate` — whenever persistence.enabled (R19 always wins).
+# Configurable RollingUpdate bounds. Ignored — the Deployment stays
+# `strategy: Recreate` — whenever persistence.enabled (that setting always wins).
 updateStrategy:
   maxSurge: ""
   maxUnavailable: ""
 
-# R13: no pod automatically mounts its ServiceAccount token unless opted in.
+# No pod automatically mounts its ServiceAccount token unless opted in.
 automountServiceAccountToken: false
 
-# R37: seconds Kubernetes waits after sending SIGTERM before force-killing the
+# Seconds Kubernetes waits after sending SIGTERM before force-killing the
 # pod; override for apps that need longer (or shorter) to drain in-flight
 # work before exit.
 terminationGracePeriodSeconds: 30
 
-# R37: sleep-drain shorthand — set `preStop.sleepSeconds` to render a
+# Sleep-drain shorthand — set `preStop.sleepSeconds` to render a
 # container lifecycle.preStop exec `sleep <n>` hook, giving in-flight
 # connections time to drain before SIGTERM is sent. Ignored whenever
 # `lifecycle` below is set.
@@ -100,7 +100,7 @@ preStop: {}
 #   preStop:
 #     sleepSeconds: 5
 
-# R37: raw Lifecycle passthrough — rendered verbatim exactly as the
+# Raw Lifecycle passthrough — rendered verbatim exactly as the
 # Kubernetes container Lifecycle spec (preStop/postStart), taking precedence
 # over preStop.sleepSeconds above. No `lifecycle` block is rendered on the
 # container when neither this nor preStop.sleepSeconds is set.
@@ -110,20 +110,20 @@ preStop: {}
 #         command: ["/bin/sh", "-c", "sleep 5 && custom-cleanup.sh"]
 lifecycle: {}
 
-# R9: pod-level strict security defaults (_security.tpl). Every field below
-# is independently overridable (R12) — set only the field you need to change,
+# Pod-level strict security defaults (_security.tpl). Every field below
+# is independently overridable — set only the field you need to change,
 # the rest keep their restricted-PSA-compliant default.
 podSecurityContext: {}
 # podSecurityContext:
 #   runAsUser: 1000        # override just this field; runAsGroup/fsGroup/etc. stay at their defaults
 
-# R10: container-level strict security defaults (_security.tpl), merged the
+# Container-level strict security defaults (_security.tpl), merged the
 # same way as podSecurityContext.
 containerSecurityContext: {}
 # containerSecurityContext:
 #   readOnlyRootFilesystem: false   # e.g. for an app that writes outside /tmp
 
-# R11: additional writable emptyDir mounts beyond the automatic /tmp one that
+# Additional writable emptyDir mounts beyond the automatic /tmp one that
 # readOnlyRootFilesystem provisions.
 #   extraEmptyDirs:
 #     - name: cache
@@ -131,7 +131,7 @@ containerSecurityContext: {}
 #       sizeLimit: 256Mi   # optional
 extraEmptyDirs: []
 
-# R43: arbitrary additional volumes/volumeMounts beyond the automatic /tmp,
+# Arbitrary additional volumes/volumeMounts beyond the automatic /tmp,
 # extraEmptyDirs, and persistence PVC — e.g. mounting a referenced Secret or
 # ConfigMap. Native Kubernetes Volume/VolumeMount shapes, assembled through
 # the same _volumes.tpl partial as the sources above so they all coexist; the
@@ -148,7 +148,7 @@ extraEmptyDirs: []
 extraVolumes: []
 extraVolumeMounts: []
 
-# R8: requests AND limits are always set; override wholesale for a hungrier app.
+# Requests AND limits are always set; override wholesale for a hungrier app.
 resources:
   requests:
     cpu: 100m
@@ -157,17 +157,17 @@ resources:
     cpu: 500m
     memory: 256Mi
 
-# R39: generic metadata passthrough. podAnnotations/podLabels apply to the pod
+# Generic metadata passthrough. podAnnotations/podLabels apply to the pod
 # template only; commonLabels/commonAnnotations apply to every resource this
 # chart renders. All four are merged with (and always overridden by) this
 # chart's managed labels/annotations — selector labels and the checksum/config
-# annotation (R17) can never be clobbered by a user-supplied key.
+# annotation can never be clobbered by a user-supplied key.
 podAnnotations: {}
 podLabels: {}
 commonLabels: {}
 commonAnnotations: {}
 
-# R38: native nodeSelector/tolerations/priorityClassName/
+# Native nodeSelector/tolerations/priorityClassName/
 # topologySpreadConstraints/affinity passthrough — each omitted from the pod
 # spec unless set. When affinity is left unset and replicaCount > 1, the
 # chart injects a default soft (preferred) pod anti-affinity across
@@ -179,14 +179,14 @@ priorityClassName: ""
 topologySpreadConstraints: []
 affinity: {}
 
-# R14: a dedicated ServiceAccount per app; set create: false and name to reuse
+# A dedicated ServiceAccount per app; set create: false and name to reuse
 # an existing one instead.
 serviceAccount:
   create: true
   name: ""
   annotations: {}
 
-# R15: maps declared ports to the pod's container ports (see deployment.yaml,
+# Maps declared ports to the pod's container ports (see deployment.yaml,
 # which renders container ports from this same list).
 service:
   type: ClusterIP
@@ -196,20 +196,19 @@ service:
       targetPort: 8080
       protocol: TCP
 
-# R39: additional annotations for the Service only, merged with
+# Additional annotations for the Service only, merged with
 # commonAnnotations (serviceAnnotations wins on conflict, being the more
 # specific of the two).
 serviceAnnotations: {}
 
-# R16: rendered into a ConfigMap when non-empty; omitted entirely otherwise.
+# Rendered into a ConfigMap when non-empty; omitted entirely otherwise.
 config: {}
 
-# R18/R19/R20: an RWO Longhorn PVC. Enabling it forces the Deployment to
+# An RWO Longhorn PVC. Enabling it forces the Deployment to
 # `strategy: Recreate` + `replicas: 1` (see deployment.yaml) since a Longhorn
 # RWO volume cannot be multi-attached during a rollout, and it must never be
-# paired with autoscaling (see the networking-operational-addons task, which
-# adds hpa.yaml — that template must gate on persistence.enabled the same way
-# this chart's replica logic does).
+# paired with autoscaling — hpa.yaml gates on persistence.enabled the same
+# way this chart's replica logic does.
 persistence:
   enabled: false
   size: 1Gi
@@ -217,24 +216,25 @@ persistence:
   mountPath: /data
   existingClaim: ""
 
-# R21/R22/R23: cluster-only by default (routing.enabled: false) — no
+# Cluster-only by default (routing.enabled: false) — no
 # HTTPRoute/Certificate/ReferenceGrant renders until routing is turned on (see
-# R24). When enabled, the chart exposes this app's Service through the lab's
-# one shared Traefik Gateway and issues it a letsencrypt certificate.
+# the routing.enabled gate in each of those templates). When enabled, the
+# chart exposes this app's Service through the lab's one shared Traefik
+# Gateway and issues it a letsencrypt certificate.
 routing:
   enabled: false
   # Hostname(s) the HTTPRoute matches and the Certificate's dnsNames are
   # derived from.
   hostnames: []
-  # R21: parentRef to the shared Gateway — name/namespace/sectionName are all
+  # ParentRef to the shared Gateway — name/namespace/sectionName are all
   # overridable per app; there is exactly one Gateway on this lab.
   gateway:
     name: shared-gateway
-    # Defaults to this release's namespace when unset (R23 default case).
+    # Defaults to this release's namespace when unset.
     namespace: ""
     # Optional; omitted from the parentRef when unset (matches any listener).
     sectionName: ""
-  # R22: TLS is on by default whenever routing is enabled — opt out per app if
+  # TLS is on by default whenever routing is enabled — opt out per app if
   # a route genuinely needs to stay HTTP-only.
   tls:
     enabled: true
@@ -244,7 +244,7 @@ routing:
     # Defaults to "<fullname>-tls" when unset.
     secretName: ""
 
-# R25: opt-in HPA. Mutually exclusive with persistence.enabled — a Longhorn
+# Opt-in HPA. Mutually exclusive with persistence.enabled — a Longhorn
 # RWO volume can only be attached to one pod, so the chart suppresses the HPA
 # (and keeps the Deployment's static replicas) whenever persistence is on,
 # regardless of this flag (see deployment.yaml/hpa.yaml).
@@ -256,15 +256,15 @@ autoscaling:
   # Omitted from the HPA's metrics when unset.
   targetMemoryUtilizationPercentage: ""
 
-# R26: opt-in PDB. minAvailable/maxUnavailable are mutually exclusive; set
+# Opt-in PDB. minAvailable/maxUnavailable are mutually exclusive; set
 # maxUnavailable to use it instead of the default minAvailable.
 pdb:
   enabled: false
   minAvailable: 1
   maxUnavailable: ""
 
-# R40: opt-in observability surface, off by default. Scrape annotations
-# render on the pod template via the R39 podAnnotations mechanism
+# Opt-in observability surface, off by default. Scrape annotations
+# render on the pod template via the generic podAnnotations merge mechanism
 # (_metadata.tpl); the ServiceMonitor (monitoring.coreos.com/v1,
 # templates/servicemonitor.yaml) requires the prometheus-operator CRDs to
 # already be installed cluster-side.
@@ -285,7 +285,7 @@ metrics:
     # Prometheus Operator's own global scrape interval).
     interval: ""
 
-# R27: opt-in default-deny-ingress NetworkPolicy. When enabled, only the
+# Opt-in default-deny-ingress NetworkPolicy. When enabled, only the
 # configured gateway namespace/pods may reach this app; everything else is
 # denied by default. Egress stays unrestricted unless additionalEgress rules
 # are supplied.

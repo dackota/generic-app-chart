@@ -1,5 +1,5 @@
 {{/*
-Auxiliary to M3 (R41) — generic "is this a real, meaningful override" check
+Auxiliary to the workload template — generic "is this a real, meaningful override" check
 for scalar values that default to the sentinel "" in values.yaml
 (revisionHistoryLimit, minReadySeconds, updateStrategy.maxSurge/
 maxUnavailable). Truthiness (`{{- with .Values.X }}`) and a bare

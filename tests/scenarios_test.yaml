@@ -1,10 +1,9 @@
-# R31: named scenario values files exercise the whole rendered surface
+# Named scenario values files exercise the whole rendered surface
 # together, rather than each module in isolation. `default.yaml` is the
 # minimal/base case; `persistent.yaml` is the persistence-enabled case;
 # `autoscaling.yaml`, `networkpolicy.yaml`, `cluster-only.yaml`, and
-# `full.yaml` exercise the networking-operational-addons task's routing/TLS,
-# HPA, PDB, and NetworkPolicy paths.
-suite: generic-app-chart scenario values files (R31)
+# `full.yaml` exercise the routing/TLS, HPA, PDB, and NetworkPolicy paths.
+suite: generic-app-chart scenario values files
 templates:
   - deployment.yaml
   - service.yaml
@@ -155,7 +154,7 @@ tests:
       - hasDocuments:
           count: 0
         template: pvc.yaml
-      # R38/R44: autoscaling's minReplicas (2) floors the effective replica
+      # Autoscaling's minReplicas (2) floors the effective replica
       # count above 1 even though replicaCount is left at its default, so the
       # default anti-affinity must render here too — the PDB and the
       # anti-affinity gate must agree on "multi-replica".
@@ -191,11 +190,11 @@ tests:
             readOnly: true
         template: deployment.yaml
 
-  # R39: the full scenario also carries commonLabels/commonAnnotations,
+  # The full scenario also carries commonLabels/commonAnnotations,
   # podAnnotations/podLabels, and serviceAnnotations — proving the generic
   # metadata passthrough coexists with every other feature the full scenario
   # exercises (routing/TLS, autoscaling, PDB, NetworkPolicy).
-  - it: propagates commonLabels and commonAnnotations to every rendered resource from the full scenario (R39)
+  - it: propagates commonLabels and commonAnnotations to every rendered resource from the full scenario
     release:
       namespace: ctd
     values:

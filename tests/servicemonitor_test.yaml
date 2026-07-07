@@ -1,5 +1,5 @@
-# R40 observability surface — opt-in ServiceMonitor (servicemonitor.yaml).
-suite: generic-app-chart ServiceMonitor (R40)
+# Observability surface — opt-in ServiceMonitor (servicemonitor.yaml).
+suite: generic-app-chart ServiceMonitor
 templates:
   - servicemonitor.yaml
 tests:
@@ -60,9 +60,9 @@ tests:
           path: spec.endpoints[0].interval
           value: 30s
 
-  # R39 generic metadata passthrough — reuses the same shared helpers as
+  # Generic metadata passthrough — reuses the same shared helpers as
   # every other rendered resource.
-  - it: adds commonLabels and commonAnnotations to the ServiceMonitor (R39)
+  - it: adds commonLabels and commonAnnotations to the ServiceMonitor
     set:
       metrics:
         serviceMonitor:
@@ -79,18 +79,18 @@ tests:
           path: metadata.annotations["owner"]
           value: platform-team
 
-  # R40 property test: the metrics block must never panic the render when a
+  # Property test: the metrics block must never panic the render when a
   # caller explicitly nulls it out or an intermediate key (the
   # "nulled-intermediate-key" bug class) — the chart must fall back to its
   # off-by-default behavior instead of crashing.
-  - it: never panics and stays off by default when metrics is explicitly nulled (R40 robustness)
+  - it: never panics and stays off by default when metrics is explicitly nulled (robustness)
     set:
       metrics: null
     asserts:
       - hasDocuments:
           count: 0
 
-  - it: never panics and stays off by default when metrics.serviceMonitor is explicitly nulled (R40 robustness)
+  - it: never panics and stays off by default when metrics.serviceMonitor is explicitly nulled (robustness)
     set:
       metrics:
         serviceMonitor: null

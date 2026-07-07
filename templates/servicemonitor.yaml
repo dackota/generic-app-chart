@@ -1,5 +1,5 @@
 {{/*
-M-observability — R40. Opt-in ServiceMonitor (monitoring.coreos.com/v1)
+M-observability. Opt-in ServiceMonitor (monitoring.coreos.com/v1)
 selecting this app's Service by its stable selector labels on a named
 metrics port already declared under service.ports, so Prometheus Operator
 can scrape it. Off by default — rendering this resource requires the

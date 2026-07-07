@@ -1,5 +1,5 @@
 {{/*
-M9 networkpolicy — R27. Default-deny-ingress: only the configured gateway
+Networkpolicy. Default-deny-ingress: only the configured gateway
 namespace/pods may reach this app; every other ingress source is denied by
 omission. Egress stays unrestricted (no Egress policyType) unless the caller
 supplies additionalEgress rules.

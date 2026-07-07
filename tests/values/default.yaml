@@ -1,4 +1,4 @@
-# R31 scenario: minimal/base case. A stateless app supplying only the values
+# Scenario: minimal/base case. A stateless app supplying only the values
 # it must (image); everything else — security defaults, resources, naming,
 # ServiceAccount — comes from the chart's strict, opt-out defaults.
 image:
