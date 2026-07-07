@@ -87,7 +87,7 @@ spec:
           {{- if .Values.lifecycle }}
           lifecycle:
             {{- toYaml .Values.lifecycle | nindent 12 }}
-          {{- else if .Values.preStop.sleepSeconds }}
+          {{- else if hasKey .Values.preStop "sleepSeconds" }}
           lifecycle:
             preStop:
               exec:

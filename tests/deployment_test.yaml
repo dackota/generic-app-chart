@@ -327,6 +327,16 @@ tests:
           path: spec.template.spec.containers[0].lifecycle.preStop.exec.command
           value: ["/bin/sh", "-c", "sleep 5"]
 
+  - it: renders the sleep-0 exec command when preStop.sleepSeconds is explicitly 0, not an absent lifecycle block (R37)
+    template: deployment.yaml
+    set:
+      preStop:
+        sleepSeconds: 0
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].lifecycle.preStop.exec.command
+          value: ["/bin/sh", "-c", "sleep 0"]
+
   - it: renders a raw lifecycle block verbatim, taking precedence over the sleep shorthand (R37)
     template: deployment.yaml
     set:
