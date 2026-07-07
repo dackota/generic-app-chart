@@ -57,6 +57,42 @@ spec:
       terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
       securityContext:
         {{- include "generic-app-chart.podSecurityContext" . | nindent 8 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if .Values.priorityClassName }}
+      priorityClassName: {{ .Values.priorityClassName }}
+      {{- end }}
+      {{- with .Values.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if .Values.affinity }}
+      affinity:
+        {{- toYaml .Values.affinity | nindent 8 }}
+      {{- else if gt (include "generic-app-chart.effectiveReplicaCount" . | int) 1 }}
+      # R38/R44: no affinity was supplied and this app effectively runs more
+      # than one replica (see .effectiveReplicaCount — this must agree with
+      # the persistence/autoscaling coupling above, otherwise an autoscaled
+      # workload floored above 1 replica by the HPA would render with no
+      # spread at all) — default to a soft (preferred, not required) spread
+      # across nodes so a node failure can't take out every replica at once,
+      # without blocking scheduling the way a hard anti-affinity would.
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                topologyKey: kubernetes.io/hostname
+                labelSelector:
+                  matchLabels:
+                    {{- include "generic-app-chart.selectorLabels" . | nindent 20 }}
+      {{- end }}
       containers:
         - name: {{ .Chart.Name }}
           securityContext:
