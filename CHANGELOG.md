@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.3.1](https://github.com/dackota/generic-app-chart/compare/v0.3.0...v0.3.1) (2026-07-07)
+
+
+### Bug Fixes
+
+* address security review findings on App-token auto-merge ([4760ce0](https://github.com/dackota/generic-app-chart/commit/4760ce0ff2c3bdcda605858f6ceca23210965151))
+* fail fast on malformed PRS_JSON instead of silently no-op'ing ([26dfd59](https://github.com/dackota/generic-app-chart/commit/26dfd5909acf4dff85ce57d1a77e797f30e4f5f0))
+* **release-please:** auto-merge release PRs via App token instead of GITHUB_TOKEN ([d31af12](https://github.com/dackota/generic-app-chart/commit/d31af1299f59ae30be333e8c1b1a9f4f0b3fc95a))
+* **release-please:** auto-merge release PRs via App token instead of GITHUB_TOKEN ([718a810](https://github.com/dackota/generic-app-chart/commit/718a8105101f6e003daaf456a5c1d6ae18a8e668))
+* scope App token permissions and guard empty parsed-PR payload ([a5c8e01](https://github.com/dackota/generic-app-chart/commit/a5c8e0172e266f5140417e5c38e18038c175ae80))
+
 ## [0.3.0](https://github.com/dackota/generic-app-chart/compare/v0.2.0...v0.3.0) (2026-07-07)
 
 
