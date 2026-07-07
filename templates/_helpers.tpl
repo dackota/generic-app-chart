@@ -40,6 +40,21 @@ duplication when the release name already contains it.
 {{- end }}
 
 {{/*
+Chart-managed labels only — selector labels plus helm.sh/chart, version, and
+managed-by — with no commonLabels folded in. This is the raw "managed" side
+used both by generic-app-chart.labels below (which folds commonLabels in) and
+by generic-app-chart.podLabels (_metadata.tpl), which needs the unfolded set
+so podLabels can correctly outrank commonLabels for the same key on the pod
+template — merging against the already-commonLabels-folded
+generic-app-chart.labels output would let any commonLabels key silently beat
+podLabels instead.
+*/}}
+{{- define "generic-app-chart.managedLabels" -}}
+{{- $selector := include "generic-app-chart.selectorLabels" . | fromYaml -}}
+{{- merge $selector (dict "helm.sh/chart" (include "generic-app-chart.chart" .) "app.kubernetes.io/version" .Chart.AppVersion "app.kubernetes.io/managed-by" .Release.Service) | toYaml -}}
+{{- end }}
+
+{{/*
 Standard Helm common labels, merged with .Values.commonLabels (R39) so every
 resource that renders through this shared helper picks up commonLabels
 automatically, without each template bolting the merge on individually.
@@ -49,8 +64,7 @@ app.kubernetes.io/name/instance would break the selectors that depend on them
 elsewhere in the chart.
 */}}
 {{- define "generic-app-chart.labels" -}}
-{{- $selector := include "generic-app-chart.selectorLabels" . | fromYaml -}}
-{{- $managed := merge $selector (dict "helm.sh/chart" (include "generic-app-chart.chart" .) "app.kubernetes.io/version" .Chart.AppVersion "app.kubernetes.io/managed-by" .Release.Service) -}}
+{{- $managed := include "generic-app-chart.managedLabels" . | fromYaml -}}
 {{- $common := .Values.commonLabels | default dict -}}
 {{- mergeOverwrite (deepCopy $common) $managed | toYaml -}}
 {{- end }}

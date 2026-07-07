@@ -342,6 +342,35 @@ tests:
           path: spec.template.metadata.labels["app.kubernetes.io/instance"]
           value: my-app
 
+  # R39 regression: podLabels is the more specific source and must win over
+  # commonLabels for the same non-reserved key on the pod template — the
+  # opposite precedence would silently discard a user's pod-specific override.
+  - it: lets podLabels win over commonLabels for the same key on the pod template (R39)
+    template: deployment.yaml
+    release:
+      name: my-app
+    set:
+      commonLabels:
+        team: from-common
+      podLabels:
+        team: from-pod
+    asserts:
+      - equal:
+          path: spec.template.metadata.labels["team"]
+          value: from-pod
+
+  - it: still lets commonLabels reach the pod template when podLabels does not set that key (R39)
+    template: deployment.yaml
+    release:
+      name: my-app
+    set:
+      commonLabels:
+        team: from-common
+    asserts:
+      - equal:
+          path: spec.template.metadata.labels["team"]
+          value: from-common
+
   - it: adds podAnnotations to the pod template without dropping the checksum/config annotation (R39, R17)
     template: deployment.yaml
     set:

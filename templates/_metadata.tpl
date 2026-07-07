@@ -6,8 +6,11 @@ podAnnotations/podLabels (pod template only), commonLabels/commonAnnotations
 with — and always overridden by — this chart's managed labels/annotations:
 selector labels (_helpers.tpl) and the checksum/config annotation (R17,
 configmap.yaml/deployment.yaml). commonLabels already flows into every
-resource through generic-app-chart.labels itself (_helpers.tpl); the helpers
-below layer the remaining, more targeted overrides on top.
+resource's own metadata.labels through generic-app-chart.labels itself
+(_helpers.tpl); the pod-template labels below re-merge commonLabels against
+the raw chart-managed set directly (not through generic-app-chart.labels) so
+podLabels can correctly outrank commonLabels for the same key — the helpers
+below layer these, and the remaining, more targeted overrides, on top.
 */}}
 
 {{/*
@@ -22,15 +25,23 @@ non-empty so callers can safely `with` the result.
 {{- end }}
 
 {{/*
-Pod template labels: this chart's standard labels (already merged with
-commonLabels) further merged with .Values.podLabels. Chart-managed labels
-always win over podLabels for the same reason commonLabels can't win over
-them — the Deployment's own selector depends on them staying stable.
+Pod template labels: .Values.commonLabels and .Values.podLabels merged with
+the chart-managed label set (selector labels, helm.sh/chart, version,
+managed-by), mirroring generic-app-chart.podAnnotations' shape below.
+podLabels — the more specific of the two user sources — wins over
+commonLabels on conflict, and chart-managed labels always win over both; the
+Deployment's own selector depends on them staying stable. Deliberately merges
+against the raw chart-managed set (generic-app-chart.managedLabels) rather
+than the commonLabels-folded generic-app-chart.labels output — merging
+against that pre-folded result would let any commonLabels key unconditionally
+beat podLabels for the same key, backwards from the intended precedence.
 */}}
 {{- define "generic-app-chart.podLabels" -}}
-{{- $managed := include "generic-app-chart.labels" . | fromYaml -}}
+{{- $managed := include "generic-app-chart.managedLabels" . | fromYaml -}}
+{{- $common := .Values.commonLabels | default dict -}}
 {{- $pod := .Values.podLabels | default dict -}}
-{{- mergeOverwrite (deepCopy $pod) $managed | toYaml -}}
+{{- $merged := mergeOverwrite (deepCopy $common) $pod -}}
+{{- mergeOverwrite $merged $managed | toYaml -}}
 {{- end }}
 
 {{/*
