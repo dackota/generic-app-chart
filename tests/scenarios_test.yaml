@@ -154,3 +154,22 @@ tests:
       - hasDocuments:
           count: 0
         template: pvc.yaml
+      - contains:
+          path: spec.template.spec.imagePullSecrets
+          content:
+            name: existing-registry-secret
+        template: deployment.yaml
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: tls-certs
+            secret:
+              secretName: existing-tls-secret
+        template: deployment.yaml
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: tls-certs
+            mountPath: /etc/tls
+            readOnly: true
+        template: deployment.yaml
