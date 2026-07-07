@@ -31,6 +31,14 @@ jobs:
           app-id: ${{ secrets.CI_APP_ID }}
           private-key: ${{ secrets.CI_APP_PRIVATE_KEY }}
           repositories: ${{ github.event.repository.name }}
+          # Scoped to exactly what release-please-action and the merge step
+          # below need: contents (commits/tags/releases), pull-requests
+          # (open/update/merge the release PR), issues (release-please uses
+          # the `autorelease: pending` label internally, on the issues API,
+          # to find its own already-open release PR on each run).
+          permission-contents: write
+          permission-pull-requests: write
+          permission-issues: write
 
       - name: Run release-please
         id: release
@@ -61,6 +69,11 @@ jobs:
           if ! parsed=$(echo "$PRS_JSON" | jq -c '.[]'); then
             echo "::error::failed to parse PRS_JSON as a JSON array"
             exit 1
+          fi
+
+          if [ -z "$parsed" ]; then
+            echo "No release PRs in the parsed payload; nothing to merge."
+            exit 0
           fi
 
           failed=0
