@@ -1,7 +1,6 @@
 # generic-app-chart
 
-A reusable, security-hardened Helm chart for deploying personal applications on a
-home-lab Kubernetes cluster. Renders a complete app — Deployment, Service,
+A reusable, security-hardened Helm chart for deploying applications on a Kubernetes cluster. Renders a complete app — Deployment, Service,
 ServiceAccount, ConfigMap, optional persistence, Gateway API routing +
 cert-manager TLS, and opt-in HPA/PDB/NetworkPolicy — from a single
 `values.yaml`, with restricted-PSA security defaults applied out of the box.
