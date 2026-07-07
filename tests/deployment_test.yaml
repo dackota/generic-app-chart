@@ -122,15 +122,22 @@ tests:
       - notExists:
           path: spec.template.spec.containers[0].envFrom
 
-  - it: omits probes when unset (R7)
+  - it: omits liveness and startup probes when unset, never defaulting them (R36)
     template: deployment.yaml
     asserts:
       - notExists:
           path: spec.template.spec.containers[0].livenessProbe
       - notExists:
-          path: spec.template.spec.containers[0].readinessProbe
-      - notExists:
           path: spec.template.spec.containers[0].startupProbe
+
+  - it: defaults readinessProbe to a tcpSocket check on the primary service port when unset (R36)
+    template: deployment.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.tcpSocket.port
+          value: 8080
+      - notExists:
+          path: spec.template.spec.containers[0].readinessProbe.httpGet
 
   - it: renders an http liveness probe when defined (R7)
     template: deployment.yaml
@@ -169,6 +176,104 @@ tests:
       - equal:
           path: spec.template.spec.containers[0].startupProbe.exec.command
           value: ["cat", "/tmp/ready"]
+
+  - it: renders an httpGet probe from the path/port shorthand (R36)
+    template: deployment.yaml
+    set:
+      livenessProbe:
+        path: /healthz
+        port: 8081
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].livenessProbe.httpGet.path
+          value: /healthz
+      - equal:
+          path: spec.template.spec.containers[0].livenessProbe.httpGet.port
+          value: 8081
+      - notExists:
+          path: spec.template.spec.containers[0].livenessProbe.tcpSocket
+
+  - it: renders a tcpSocket probe from the port-only shorthand (R36)
+    template: deployment.yaml
+    set:
+      startupProbe:
+        port: 9090
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].startupProbe.tcpSocket.port
+          value: 9090
+      - notExists:
+          path: spec.template.spec.containers[0].startupProbe.httpGet
+
+  - it: passes extra native Probe fields through the shorthand (R36)
+    template: deployment.yaml
+    set:
+      readinessProbe:
+        path: /ready
+        port: 8080
+        initialDelaySeconds: 3
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.httpGet.path
+          value: /ready
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.initialDelaySeconds
+          value: 3
+
+  - it: a shorthand readinessProbe overrides the default tcpSocket probe (R36)
+    template: deployment.yaml
+    set:
+      readinessProbe:
+        path: /ready
+        port: 9091
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.httpGet.port
+          value: 9091
+      - notExists:
+          path: spec.template.spec.containers[0].readinessProbe.tcpSocket
+
+  - it: a raw native readinessProbe block overrides the default tcpSocket probe (R36)
+    template: deployment.yaml
+    set:
+      readinessProbe:
+        httpGet:
+          path: /ready
+          port: 9092
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.httpGet.path
+          value: /ready
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.httpGet.port
+          value: 9092
+      - notExists:
+          path: spec.template.spec.containers[0].readinessProbe.tcpSocket
+
+  - it: configuring probes never alters the security context or other pod fields (R36)
+    template: deployment.yaml
+    set:
+      livenessProbe:
+        path: /healthz
+        port: 8080
+      readinessProbe:
+        path: /ready
+        port: 8080
+      startupProbe:
+        port: 8080
+    asserts:
+      - equal:
+          path: spec.template.spec.securityContext.runAsNonRoot
+          value: true
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.readOnlyRootFilesystem
+          value: true
+      - equal:
+          path: spec.template.spec.containers[0].resources.requests.cpu
+          value: 100m
+      - equal:
+          path: spec.template.spec.serviceAccountName
+          value: RELEASE-NAME-generic-app-chart
 
   - it: always sets sane default resource requests and limits (R8)
     template: deployment.yaml

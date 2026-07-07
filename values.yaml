@@ -38,8 +38,24 @@ env: []
 #         name: existing-app-config
 envFrom: []
 
-# R7: only rendered when set; supports httpGet/tcpSocket/exec forms exactly as
-# the Kubernetes Probe spec does.
+# R7/R36: each of livenessProbe/readinessProbe/startupProbe accepts three
+# forms, tried in this order:
+#   1. A raw native Probe block — supports httpGet/tcpSocket/exec/grpc
+#      exactly as the Kubernetes Probe spec does — rendered verbatim,
+#      overriding the shorthand/default below.
+#   2. A shorthand: {path, port} for an HTTP probe, or {port} alone for a
+#      TCP probe; any other native Probe field (initialDelaySeconds,
+#      periodSeconds, ...) may be added alongside and passes through as-is.
+#        readinessProbe:
+#          path: /healthz
+#          port: 8080
+#          initialDelaySeconds: 5
+#   3. Empty (the {} default) — omitted, except readinessProbe, which falls
+#      back to a tcpSocket check on the primary service port
+#      (service.ports[0].targetPort) when no readiness probe is configured.
+#      livenessProbe/startupProbe never get a synthesized default — a bad
+#      default liveness probe would cause restart loops, so both stay
+#      strictly opt-in.
 livenessProbe: {}
 readinessProbe: {}
 startupProbe: {}
