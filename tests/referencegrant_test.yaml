@@ -36,7 +36,7 @@ tests:
       - hasDocuments:
           count: 0
 
-  - it: renders a ReferenceGrant authorizing the Gateway namespace to reach this namespace's Service/Secret when namespaces differ (R23)
+  - it: renders a ReferenceGrant scoped by name to this app's own Service/Secret when namespaces differ and TLS is enabled (R23)
     release:
       name: my-app
       namespace: my-app-ns
@@ -65,8 +65,38 @@ tests:
           content:
             group: ""
             kind: Service
+            name: my-app-generic-app-chart
       - contains:
           path: spec.to
           content:
             group: ""
             kind: Secret
+            name: my-app-generic-app-chart-tls
+
+  - it: omits the Secret grant when namespaces differ but TLS is disabled — no Secret exists to justify the grant (R23)
+    release:
+      name: my-app
+      namespace: my-app-ns
+    set:
+      routing:
+        enabled: true
+        hostnames: ["my-app.dackota.dev"]
+        gateway:
+          namespace: traefik
+        tls:
+          enabled: false
+    asserts:
+      - hasDocuments:
+          count: 1
+      - contains:
+          path: spec.to
+          content:
+            group: ""
+            kind: Service
+            name: my-app-generic-app-chart
+      - notContains:
+          path: spec.to
+          content:
+            group: ""
+            kind: Secret
+            name: my-app-generic-app-chart-tls

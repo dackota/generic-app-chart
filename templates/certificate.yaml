@@ -10,7 +10,7 @@ metadata:
   labels:
     {{- include "generic-app-chart.labels" . | nindent 4 }}
 spec:
-  secretName: {{ .Values.routing.tls.secretName | default (printf "%s-tls" (include "generic-app-chart.fullname" .)) }}
+  secretName: {{ include "generic-app-chart.tlsSecretName" . }}
   dnsNames:
     {{- toYaml .Values.routing.hostnames | nindent 4 }}
   issuerRef:
