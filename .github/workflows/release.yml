@@ -1,0 +1,45 @@
+name: release
+
+# R30: on a v* tag (created by release-please when its release PR merges),
+# package this chart and push it to GHCR as an OCI artifact.
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+  # Required for `helm registry login ghcr.io` / `helm push` using
+  # GITHUB_TOKEN as the GHCR credential.
+  packages: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.15.0
+
+      - name: Log in to GHCR
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io \
+            --username "${{ github.actor }}" \
+            --password-stdin
+
+      - name: Package chart
+        run: helm package . --destination .dist
+
+      - name: Push chart to GHCR
+        run: |
+          chart_package=$(ls .dist/*.tgz)
+          helm push "$chart_package" oci://ghcr.io/dackota/charts
+
+      - name: Manual step reminder
+        run: |
+          echo "::notice::After the FIRST publish of a new package, GHCR defaults its visibility to private."
+          echo "::notice::A repo maintainer must manually set oci://ghcr.io/dackota/charts/generic-app-chart to public (GitHub package settings -> Change visibility). This cannot be automated from a workflow and is not a pipeline failure."

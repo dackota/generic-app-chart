@@ -1,0 +1,114 @@
+# Default values for generic-app-chart.
+# This is a YAML-formatted file — see README.md for the full reference.
+
+# R2: derived names default to "<release>-<chart>" (or just "<release>" when
+# the release name already contains the chart name). Override either to
+# control the name every resource in this chart is rendered under.
+nameOverride: ""
+fullnameOverride: ""
+
+image:
+  repository: ""
+  # Defaults to .Chart.AppVersion when unset.
+  tag: ""
+  pullPolicy: IfNotPresent
+
+# R3: omitted from the container spec when unset.
+command: []
+args: []
+
+# R4/R6: plain and valueFrom-sourced entries — this is the native Kubernetes
+# EnvVar shape, so both forms live in one list:
+#   env:
+#     - name: LOG_LEVEL
+#       value: debug
+#     - name: DB_PASSWORD
+#       valueFrom:
+#         secretKeyRef:
+#           name: existing-db-secret   # a referenced Secret — never created by this chart
+#           key: password
+env: []
+
+# R5: references an existing Secret/ConfigMap by name — this chart never
+# creates the Secret/ConfigMap being referenced here.
+#   envFrom:
+#     - secretRef:
+#         name: existing-app-secret
+#     - configMapRef:
+#         name: existing-app-config
+envFrom: []
+
+# R7: only rendered when set; supports httpGet/tcpSocket/exec forms exactly as
+# the Kubernetes Probe spec does.
+livenessProbe: {}
+readinessProbe: {}
+startupProbe: {}
+
+# Ignored (forced to 1) when persistence.enabled — see R19 in deployment.yaml.
+replicaCount: 1
+
+# R13: no pod automatically mounts its ServiceAccount token unless opted in.
+automountServiceAccountToken: false
+
+# R9: pod-level strict security defaults (_security.tpl). Every field below
+# is independently overridable (R12) — set only the field you need to change,
+# the rest keep their restricted-PSA-compliant default.
+podSecurityContext: {}
+# podSecurityContext:
+#   runAsUser: 1000        # override just this field; runAsGroup/fsGroup/etc. stay at their defaults
+
+# R10: container-level strict security defaults (_security.tpl), merged the
+# same way as podSecurityContext.
+containerSecurityContext: {}
+# containerSecurityContext:
+#   readOnlyRootFilesystem: false   # e.g. for an app that writes outside /tmp
+
+# R11: additional writable emptyDir mounts beyond the automatic /tmp one that
+# readOnlyRootFilesystem provisions.
+#   extraEmptyDirs:
+#     - name: cache
+#       mountPath: /var/cache/app
+#       sizeLimit: 256Mi   # optional
+extraEmptyDirs: []
+
+# R8: requests AND limits are always set; override wholesale for a hungrier app.
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi
+
+# R14: a dedicated ServiceAccount per app; set create: false and name to reuse
+# an existing one instead.
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+# R15: maps declared ports to the pod's container ports (see deployment.yaml,
+# which renders container ports from this same list).
+service:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080
+      protocol: TCP
+
+# R16: rendered into a ConfigMap when non-empty; omitted entirely otherwise.
+config: {}
+
+# R18/R19/R20: an RWO Longhorn PVC. Enabling it forces the Deployment to
+# `strategy: Recreate` + `replicas: 1` (see deployment.yaml) since a Longhorn
+# RWO volume cannot be multi-attached during a rollout, and it must never be
+# paired with autoscaling (see the networking-operational-addons task, which
+# adds hpa.yaml — that template must gate on persistence.enabled the same way
+# this chart's replica logic does).
+persistence:
+  enabled: false
+  size: 1Gi
+  storageClass: longhorn
+  mountPath: /data
+  existingClaim: ""

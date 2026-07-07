@@ -1,0 +1,58 @@
+# M7 service (service.yaml) — R15.
+suite: generic-app-chart Service (M7)
+templates:
+  - service.yaml
+tests:
+  - it: renders a ClusterIP Service by default mapping declared ports
+    set:
+      service.ports:
+        - name: http
+          port: 80
+          targetPort: 8080
+          protocol: TCP
+    asserts:
+      - isKind:
+          of: Service
+      - equal:
+          path: spec.type
+          value: ClusterIP
+      - equal:
+          path: spec.ports[0].name
+          value: http
+      - equal:
+          path: spec.ports[0].port
+          value: 80
+      - equal:
+          path: spec.ports[0].targetPort
+          value: 8080
+      - equal:
+          path: spec.ports[0].protocol
+          value: TCP
+
+  - it: allows overriding the Service type
+    set:
+      service.type: LoadBalancer
+      service.ports:
+        - name: http
+          port: 80
+          targetPort: 8080
+    asserts:
+      - equal:
+          path: spec.type
+          value: LoadBalancer
+
+  - it: selects pods via the chart's stable selector labels
+    release:
+      name: my-app
+    set:
+      service.ports:
+        - name: http
+          port: 80
+          targetPort: 8080
+    asserts:
+      - equal:
+          path: spec.selector["app.kubernetes.io/name"]
+          value: generic-app-chart
+      - equal:
+          path: spec.selector["app.kubernetes.io/instance"]
+          value: my-app

@@ -1,0 +1,121 @@
+# M4 persistence (pvc.yaml + the Recreate/replicas=1 coupling in
+# deployment.yaml) — R18, R19, R20.
+suite: generic-app-chart persistence (M4)
+templates:
+  - pvc.yaml
+  - deployment.yaml
+tests:
+  - it: renders no PVC when persistence is disabled
+    template: pvc.yaml
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders an RWO PVC with the configured size, storageClass, when persistence is enabled (R18)
+    template: pvc.yaml
+    set:
+      persistence:
+        enabled: true
+        size: 5Gi
+        storageClass: longhorn
+    asserts:
+      - isKind:
+          of: PersistentVolumeClaim
+      - equal:
+          path: spec.accessModes
+          value: ["ReadWriteOnce"]
+      - equal:
+          path: spec.resources.requests.storage
+          value: 5Gi
+      - equal:
+          path: spec.storageClassName
+          value: longhorn
+
+  - it: defaults the storageClass to longhorn (R18)
+    template: pvc.yaml
+    set:
+      persistence.enabled: true
+    asserts:
+      - equal:
+          path: spec.storageClassName
+          value: longhorn
+
+  - it: renders no PVC when an existingClaim is supplied (R18)
+    template: pvc.yaml
+    set:
+      persistence:
+        enabled: true
+        existingClaim: my-existing-pvc
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: uses a single replica and defaults to the configured replicaCount when persistence is disabled (R19)
+    template: deployment.yaml
+    set:
+      replicaCount: 3
+    asserts:
+      - equal:
+          path: spec.replicas
+          value: 3
+      - notExists:
+          path: spec.strategy
+
+  - it: forces strategy Recreate and replicas 1 when persistence is enabled, regardless of replicaCount (R19)
+    template: deployment.yaml
+    set:
+      replicaCount: 3
+      persistence:
+        enabled: true
+    asserts:
+      - equal:
+          path: spec.replicas
+          value: 1
+      - equal:
+          path: spec.strategy.type
+          value: Recreate
+
+  - it: mounts the created PVC into the container at the configured mountPath (R18)
+    template: deployment.yaml
+    release:
+      name: my-app
+    set:
+      persistence:
+        enabled: true
+        mountPath: /data
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: data
+            mountPath: /data
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: data
+            persistentVolumeClaim:
+              claimName: my-app-generic-app-chart
+
+  - it: mounts an existingClaim into the container instead of creating a PVC (R18)
+    template: deployment.yaml
+    set:
+      persistence:
+        enabled: true
+        existingClaim: my-existing-pvc
+        mountPath: /data
+    asserts:
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: data
+            persistentVolumeClaim:
+              claimName: my-existing-pvc
+
+  - it: does not mount a persistence volume when persistence is disabled (R18)
+    template: deployment.yaml
+    asserts:
+      - notContains:
+          path: spec.template.spec.volumes
+          content:
+            name: data
+          any: true

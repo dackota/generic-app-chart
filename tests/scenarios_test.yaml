@@ -1,0 +1,62 @@
+# R31: named scenario values files exercise the whole rendered surface
+# together, rather than each module in isolation. `default.yaml` is the
+# minimal/base case; `persistent.yaml` is the persistence-enabled case. (The
+# remaining scenario files named in the PRD — autoscaling, networkpolicy,
+# cluster-only, full — belong to the networking-operational-addons task,
+# which builds the features they exercise; not stubbed here.)
+suite: generic-app-chart scenario values files (R31)
+templates:
+  - deployment.yaml
+  - service.yaml
+  - serviceaccount.yaml
+  - pvc.yaml
+tests:
+  - it: renders a coherent app from the default scenario
+    values:
+      - ./values/default.yaml
+    asserts:
+      - containsDocument:
+          kind: Deployment
+          apiVersion: apps/v1
+        template: deployment.yaml
+      - containsDocument:
+          kind: Service
+          apiVersion: v1
+        template: service.yaml
+      - containsDocument:
+          kind: ServiceAccount
+          apiVersion: v1
+        template: serviceaccount.yaml
+      - hasDocuments:
+          count: 0
+        template: pvc.yaml
+      - equal:
+          path: spec.replicas
+          value: 1
+        template: deployment.yaml
+      - notExists:
+          path: spec.strategy
+        template: deployment.yaml
+
+  - it: renders a coherent stateful app from the persistent scenario
+    values:
+      - ./values/persistent.yaml
+    asserts:
+      - containsDocument:
+          kind: PersistentVolumeClaim
+          apiVersion: v1
+        template: pvc.yaml
+      - equal:
+          path: spec.replicas
+          value: 1
+        template: deployment.yaml
+      - equal:
+          path: spec.strategy.type
+          value: Recreate
+        template: deployment.yaml
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: data
+          any: true
+        template: deployment.yaml

@@ -1,0 +1,296 @@
+# M3 workload (deployment.yaml) — R1, R3-R8, R13.
+suite: generic-app-chart Deployment (M3 workload)
+templates:
+  - deployment.yaml
+  - configmap.yaml
+tests:
+  - it: renders the container image from repository and tag
+    template: deployment.yaml
+    set:
+      image.repository: ghcr.io/dackota/podinfo
+      image.tag: "6.5.0"
+    asserts:
+      - isKind:
+          of: Deployment
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: ghcr.io/dackota/podinfo:6.5.0
+
+  - it: defaults the image tag to the chart appVersion when unset
+    template: deployment.yaml
+    set:
+      image.repository: ghcr.io/dackota/podinfo
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: ghcr.io/dackota/podinfo:1.0.0
+
+  - it: renders the configured pull policy
+    template: deployment.yaml
+    set:
+      image.repository: ghcr.io/dackota/podinfo
+      image.pullPolicy: Always
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].imagePullPolicy
+          value: Always
+
+  - it: omits command and args when unset (R3)
+    template: deployment.yaml
+    asserts:
+      - notExists:
+          path: spec.template.spec.containers[0].command
+      - notExists:
+          path: spec.template.spec.containers[0].args
+
+  - it: renders command and args when set via values (R3)
+    template: deployment.yaml
+    set:
+      command: ["/bin/sh"]
+      args: ["-c", "echo hi"]
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].command
+          value: ["/bin/sh"]
+      - equal:
+          path: spec.template.spec.containers[0].args
+          value: ["-c", "echo hi"]
+
+  - it: renders plain environment variables from values (R4)
+    template: deployment.yaml
+    set:
+      env:
+        - name: LOG_LEVEL
+          value: debug
+        - name: PORT
+          value: "8080"
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].env
+          value:
+            - name: LOG_LEVEL
+              value: debug
+            - name: PORT
+              value: "8080"
+
+  - it: renders individual env entries sourced from secretKeyRef/configMapKeyRef (R6)
+    template: deployment.yaml
+    set:
+      env:
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: existing-db-secret
+              key: password
+        - name: FEATURE_FLAG
+          valueFrom:
+            configMapKeyRef:
+              name: existing-feature-config
+              key: flag
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].env[0].valueFrom.secretKeyRef.name
+          value: existing-db-secret
+      - equal:
+          path: spec.template.spec.containers[0].env[0].valueFrom.secretKeyRef.key
+          value: password
+      - equal:
+          path: spec.template.spec.containers[0].env[1].valueFrom.configMapKeyRef.name
+          value: existing-feature-config
+
+  - it: renders envFrom entries referencing existing secretRef/configMapRef by name (R5)
+    template: deployment.yaml
+    set:
+      envFrom:
+        - secretRef:
+            name: existing-app-secret
+        - configMapRef:
+            name: existing-app-config
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].envFrom[0].secretRef.name
+          value: existing-app-secret
+      - equal:
+          path: spec.template.spec.containers[0].envFrom[1].configMapRef.name
+          value: existing-app-config
+
+  - it: omits env and envFrom when unset
+    template: deployment.yaml
+    asserts:
+      - notExists:
+          path: spec.template.spec.containers[0].env
+      - notExists:
+          path: spec.template.spec.containers[0].envFrom
+
+  - it: omits probes when unset (R7)
+    template: deployment.yaml
+    asserts:
+      - notExists:
+          path: spec.template.spec.containers[0].livenessProbe
+      - notExists:
+          path: spec.template.spec.containers[0].readinessProbe
+      - notExists:
+          path: spec.template.spec.containers[0].startupProbe
+
+  - it: renders an http liveness probe when defined (R7)
+    template: deployment.yaml
+    set:
+      livenessProbe:
+        httpGet:
+          path: /healthz
+          port: 8080
+        initialDelaySeconds: 5
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].livenessProbe.httpGet.path
+          value: /healthz
+      - equal:
+          path: spec.template.spec.containers[0].livenessProbe.initialDelaySeconds
+          value: 5
+
+  - it: renders a tcp readiness probe when defined (R7)
+    template: deployment.yaml
+    set:
+      readinessProbe:
+        tcpSocket:
+          port: 8080
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.tcpSocket.port
+          value: 8080
+
+  - it: renders an exec startup probe when defined (R7)
+    template: deployment.yaml
+    set:
+      startupProbe:
+        exec:
+          command: ["cat", "/tmp/ready"]
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].startupProbe.exec.command
+          value: ["cat", "/tmp/ready"]
+
+  - it: always sets sane default resource requests and limits (R8)
+    template: deployment.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].resources.requests.cpu
+          value: 100m
+      - equal:
+          path: spec.template.spec.containers[0].resources.requests.memory
+          value: 128Mi
+      - equal:
+          path: spec.template.spec.containers[0].resources.limits.cpu
+          value: 500m
+      - equal:
+          path: spec.template.spec.containers[0].resources.limits.memory
+          value: 256Mi
+
+  - it: allows fully overriding resources via values (R8)
+    template: deployment.yaml
+    set:
+      resources:
+        requests:
+          cpu: 250m
+          memory: 512Mi
+        limits:
+          cpu: "1"
+          memory: 1Gi
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].resources.requests.cpu
+          value: 250m
+      - equal:
+          path: spec.template.spec.containers[0].resources.limits.memory
+          value: 1Gi
+
+  - it: references the chart's ServiceAccount from the pod spec (R14)
+    template: deployment.yaml
+    release:
+      name: my-app
+    asserts:
+      - equal:
+          path: spec.template.spec.serviceAccountName
+          value: my-app-generic-app-chart
+
+  - it: references an overridden ServiceAccount name from the pod spec (R14)
+    template: deployment.yaml
+    set:
+      serviceAccount.name: custom-sa
+    asserts:
+      - equal:
+          path: spec.template.spec.serviceAccountName
+          value: custom-sa
+
+  - it: maps declared service ports onto the container's ports (R15)
+    template: deployment.yaml
+    set:
+      service.ports:
+        - name: http
+          port: 80
+          targetPort: 8080
+          protocol: TCP
+        - name: metrics
+          port: 9090
+          targetPort: 9090
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].ports[0].name
+          value: http
+      - equal:
+          path: spec.template.spec.containers[0].ports[0].containerPort
+          value: 8080
+      - equal:
+          path: spec.template.spec.containers[0].ports[0].protocol
+          value: TCP
+      - equal:
+          path: spec.template.spec.containers[0].ports[1].containerPort
+          value: 9090
+
+  - it: adds a config checksum annotation to the pod template when config is set (R17)
+    template: deployment.yaml
+    set:
+      config:
+        LOG_LEVEL: debug
+    asserts:
+      - matchRegex:
+          path: spec.template.metadata.annotations["checksum/config"]
+          pattern: "^[0-9a-f]{64}$"
+
+  - it: omits the config checksum annotation when no config is set
+    template: deployment.yaml
+    asserts:
+      - notExists:
+          path: spec.template.metadata.annotations
+
+  # Golden-value pair (R17): independently rendered once via `helm template
+  # myrelease . --set config.LOG_LEVEL=<value> -s templates/deployment.yaml`
+  # and pinned here. Proves the checksum is sensitive to config content (i.e.
+  # editing config actually changes the annotation and so triggers a
+  # rollout), not just that it exists.
+  - it: pins the checksum for a known config payload (golden value)
+    template: deployment.yaml
+    release:
+      name: myrelease
+    set:
+      config:
+        LOG_LEVEL: debug
+    asserts:
+      - equal:
+          path: spec.template.metadata.annotations["checksum/config"]
+          value: 5dca1b4971fcf24f18b601f3ea7006249acb16174bd63afaf610e21e07b4bccf
+
+  - it: changes the checksum when config content changes (R17)
+    template: deployment.yaml
+    release:
+      name: myrelease
+    set:
+      config:
+        LOG_LEVEL: verbose
+    asserts:
+      - equal:
+          path: spec.template.metadata.annotations["checksum/config"]
+          value: d5eb15b7a1e03c3244d587e0e1662dab7e72e024d9027f0916be87353ee66714
+      - notEqual:
+          path: spec.template.metadata.annotations["checksum/config"]
+          value: 5dca1b4971fcf24f18b601f3ea7006249acb16174bd63afaf610e21e07b4bccf

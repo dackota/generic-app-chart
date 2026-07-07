@@ -1,0 +1,21 @@
+apiVersion: v2
+name: generic-app-chart
+description: >-
+  A reusable, security-hardened Helm chart for deploying personal apps on a
+  home-lab Kubernetes cluster (Oracle free-tier OKE, GitOps via ArgoCD).
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+# R29: minimum cluster version this chart targets. See README "Prerequisites"
+# for the CRDs/capabilities (Gateway API, cert-manager, Longhorn, metrics-server)
+# required by the full app surface this chart renders across all its tasks.
+kubeVersion: ">=1.27.0-0"
+home: https://github.com/dackota/personal-generic-app-chart
+sources:
+  - https://github.com/dackota/personal-generic-app-chart
+keywords:
+  - homelab
+  - generic-app-chart
+  - security-hardened
+maintainers:
+  - name: Dackota Johnson

@@ -1,0 +1,88 @@
+{{- $volumeMounts := include "generic-app-chart.volumeMounts" . -}}
+{{- $volumes := include "generic-app-chart.volumes" . -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "generic-app-chart.fullname" . }}
+  labels:
+    {{- include "generic-app-chart.labels" . | nindent 4 }}
+spec:
+  # R19: persistence forces a single replica — a Longhorn RWO volume can only
+  # be attached to one pod at a time, so a rolling update would deadlock.
+  replicas: {{ if .Values.persistence.enabled }}1{{ else }}{{ .Values.replicaCount }}{{ end }}
+  {{- if .Values.persistence.enabled }}
+  # R19: Recreate (not RollingUpdate) so the old pod detaches the RWO volume
+  # before the new one attaches it.
+  strategy:
+    type: Recreate
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "generic-app-chart.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- if .Values.config }}
+      annotations:
+        # R17: forces a rollout when config data changes, since a ConfigMap
+        # update alone does not restart pods that already mounted it.
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+      {{- end }}
+      labels:
+        {{- include "generic-app-chart.labels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "generic-app-chart.serviceAccountName" . }}
+      automountServiceAccountToken: {{ .Values.automountServiceAccountToken }}
+      securityContext:
+        {{- include "generic-app-chart.podSecurityContext" . | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- include "generic-app-chart.containerSecurityContext" . | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- with .Values.service.ports }}
+          ports:
+            {{- range . }}
+            - name: {{ .name }}
+              containerPort: {{ .targetPort }}
+              protocol: {{ .protocol | default "TCP" }}
+            {{- end }}
+          {{- end }}
+          {{- with .Values.command }}
+          command:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.args }}
+          args:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.env }}
+          env:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.envFrom }}
+          envFrom:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.livenessProbe }}
+          livenessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.readinessProbe }}
+          readinessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.startupProbe }}
+          startupProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          {{- with $volumeMounts }}
+          volumeMounts:
+            {{- . | nindent 12 }}
+          {{- end }}
+      {{- with $volumes }}
+      volumes:
+        {{- . | nindent 6 }}
+      {{- end }}

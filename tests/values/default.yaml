@@ -1,0 +1,13 @@
+# R31 scenario: minimal/base case. A stateless app supplying only the values
+# it must (image); everything else — security defaults, resources, naming,
+# ServiceAccount — comes from the chart's strict, opt-out defaults.
+image:
+  repository: ghcr.io/dackota/podinfo
+  tag: "6.5.0"
+
+service:
+  ports:
+    - name: http
+      port: 80
+      targetPort: 9898
+      protocol: TCP
