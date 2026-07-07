@@ -434,6 +434,32 @@ tests:
       - notExists:
           path: spec.template.spec.affinity
 
+  - it: injects the default anti-affinity from autoscaling's minReplicas floor even when replicaCount is left at its default of 1 (R38/R44)
+    template: deployment.yaml
+    release:
+      name: my-app
+    set:
+      autoscaling:
+        enabled: true
+        minReplicas: 5
+    asserts:
+      - equal:
+          path: spec.template.spec.affinity.podAntiAffinity.preferredDuringSchedulingIgnoredDuringExecution[0].weight
+          value: 100
+      - equal:
+          path: spec.template.spec.affinity.podAntiAffinity.preferredDuringSchedulingIgnoredDuringExecution[0].podAffinityTerm.topologyKey
+          value: kubernetes.io/hostname
+
+  - it: does not inject a default anti-affinity when autoscaling's minReplicas is 1, even though autoscaling is enabled (R38/R44)
+    template: deployment.yaml
+    set:
+      autoscaling:
+        enabled: true
+        minReplicas: 1
+    asserts:
+      - notExists:
+          path: spec.template.spec.affinity
+
   - it: changes the checksum when config content changes (R17)
     template: deployment.yaml
     release:
