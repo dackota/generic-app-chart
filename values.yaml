@@ -13,6 +13,13 @@ image:
   tag: ""
   pullPolicy: IfNotPresent
 
+# R42: references existing (referenced) image-pull Secret(s) by name for
+# private-registry pulls — this chart never creates the Secret being
+# referenced here. Omitted from the pod spec entirely when empty.
+#   imagePullSecrets:
+#     - name: existing-registry-secret
+imagePullSecrets: []
+
 # R3: omitted from the container spec when unset.
 command: []
 args: []
@@ -70,6 +77,23 @@ containerSecurityContext: {}
 #       mountPath: /var/cache/app
 #       sizeLimit: 256Mi   # optional
 extraEmptyDirs: []
+
+# R43: arbitrary additional volumes/volumeMounts beyond the automatic /tmp,
+# extraEmptyDirs, and persistence PVC — e.g. mounting a referenced Secret or
+# ConfigMap. Native Kubernetes Volume/VolumeMount shapes, assembled through
+# the same _volumes.tpl partial as the sources above so they all coexist; the
+# `name` in each extraVolumes entry must match the corresponding
+# extraVolumeMounts entry.
+#   extraVolumes:
+#     - name: tls-certs
+#       secret:
+#         secretName: existing-tls-secret   # a referenced Secret — never created by this chart
+#   extraVolumeMounts:
+#     - name: tls-certs
+#       mountPath: /etc/tls
+#       readOnly: true
+extraVolumes: []
+extraVolumeMounts: []
 
 # R8: requests AND limits are always set; override wholesale for a hungrier app.
 resources:

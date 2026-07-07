@@ -39,6 +39,10 @@ spec:
       labels:
         {{- include "generic-app-chart.podLabels" . | nindent 8 }}
     spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       serviceAccountName: {{ include "generic-app-chart.serviceAccountName" . }}
       automountServiceAccountToken: {{ .Values.automountServiceAccountToken }}
       securityContext:

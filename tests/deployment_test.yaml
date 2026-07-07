@@ -1,4 +1,4 @@
-# M3 workload (deployment.yaml) — R1, R3-R8, R13.
+# M3 workload (deployment.yaml) — R1, R3-R8, R13, R36-R44.
 suite: generic-app-chart Deployment (M3 workload)
 templates:
   - deployment.yaml
@@ -509,3 +509,120 @@ tests:
     asserts:
       - notExists:
           path: spec.template.metadata.annotations["prometheus.io/scrape"]
+  - it: renders imagePullSecrets on the pod spec when set (R42)
+    template: deployment.yaml
+    set:
+      imagePullSecrets:
+        - name: existing-registry-secret
+        - name: another-registry-secret
+    asserts:
+      - equal:
+          path: spec.template.spec.imagePullSecrets
+          value:
+            - name: existing-registry-secret
+            - name: another-registry-secret
+
+  - it: omits imagePullSecrets from the pod spec when unset (R42)
+    template: deployment.yaml
+    asserts:
+      - notExists:
+          path: spec.template.spec.imagePullSecrets
+
+  - it: renders extraVolumes/extraVolumeMounts on the pod and container, coexisting with the auto /tmp mount (R11, R43)
+    template: deployment.yaml
+    set:
+      extraVolumes:
+        - name: tls-certs
+          secret:
+            secretName: existing-tls-secret
+      extraVolumeMounts:
+        - name: tls-certs
+          mountPath: /etc/tls
+          readOnly: true
+    asserts:
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: tls-certs
+            secret:
+              secretName: existing-tls-secret
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: tls-certs
+            mountPath: /etc/tls
+            readOnly: true
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: tmp
+            emptyDir: {}
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: tmp
+            mountPath: /tmp
+
+  - it: coexists with extraEmptyDirs and the persistence PVC when all are set together (R11, R18, R43)
+    template: deployment.yaml
+    release:
+      name: my-app
+    set:
+      extraEmptyDirs:
+        - name: cache
+          mountPath: /var/cache/app
+      persistence:
+        enabled: true
+        mountPath: /data
+      extraVolumes:
+        - name: tls-certs
+          secret:
+            secretName: existing-tls-secret
+      extraVolumeMounts:
+        - name: tls-certs
+          mountPath: /etc/tls
+          readOnly: true
+    asserts:
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: tmp
+            emptyDir: {}
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: cache
+            emptyDir: {}
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: data
+            persistentVolumeClaim:
+              claimName: my-app-generic-app-chart
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: tls-certs
+            secret:
+              secretName: existing-tls-secret
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: tmp
+            mountPath: /tmp
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: cache
+            mountPath: /var/cache/app
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: data
+            mountPath: /data
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: tls-certs
+            mountPath: /etc/tls
+            readOnly: true
