@@ -119,3 +119,18 @@ tests:
           content:
             name: data
           any: true
+
+  - it: keeps strategy Recreate and renders no rollingUpdate block when persistence is enabled, even with a configured updateStrategy (R19 wins over R41)
+    template: deployment.yaml
+    set:
+      persistence:
+        enabled: true
+      updateStrategy:
+        maxSurge: 1
+        maxUnavailable: 0
+    asserts:
+      - equal:
+          path: spec.strategy.type
+          value: Recreate
+      - notExists:
+          path: spec.strategy.rollingUpdate

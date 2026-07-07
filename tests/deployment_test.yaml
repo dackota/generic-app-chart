@@ -294,3 +294,53 @@ tests:
       - notEqual:
           path: spec.template.metadata.annotations["checksum/config"]
           value: 5dca1b4971fcf24f18b601f3ea7006249acb16174bd63afaf610e21e07b4bccf
+
+  - it: omits revisionHistoryLimit and minReadySeconds when unset (R41)
+    template: deployment.yaml
+    asserts:
+      - notExists:
+          path: spec.revisionHistoryLimit
+      - notExists:
+          path: spec.minReadySeconds
+
+  - it: renders revisionHistoryLimit and minReadySeconds when set (R41)
+    template: deployment.yaml
+    set:
+      revisionHistoryLimit: 3
+      minReadySeconds: 10
+    asserts:
+      - equal:
+          path: spec.revisionHistoryLimit
+          value: 3
+      - equal:
+          path: spec.minReadySeconds
+          value: 10
+
+  - it: renders a configurable RollingUpdate strategy with maxSurge and maxUnavailable when persistence is disabled (R41)
+    template: deployment.yaml
+    set:
+      updateStrategy:
+        maxSurge: 1
+        maxUnavailable: 0
+    asserts:
+      - equal:
+          path: spec.strategy.type
+          value: RollingUpdate
+      - equal:
+          path: spec.strategy.rollingUpdate.maxSurge
+          value: 1
+      - equal:
+          path: spec.strategy.rollingUpdate.maxUnavailable
+          value: 0
+
+  - it: renders only the configured half of the RollingUpdate strategy when just maxSurge is set (R41)
+    template: deployment.yaml
+    set:
+      updateStrategy:
+        maxSurge: "25%"
+    asserts:
+      - equal:
+          path: spec.strategy.rollingUpdate.maxSurge
+          value: "25%"
+      - notExists:
+          path: spec.strategy.rollingUpdate.maxUnavailable

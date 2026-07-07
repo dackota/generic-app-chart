@@ -1,5 +1,8 @@
 {{- $volumeMounts := include "generic-app-chart.volumeMounts" . -}}
 {{- $volumes := include "generic-app-chart.volumes" . -}}
+{{/* R41: "set/unset" (not truthiness) checks — an explicit 0 must still render. */}}
+{{- $maxSurge := toString .Values.updateStrategy.maxSurge -}}
+{{- $maxUnavailable := toString .Values.updateStrategy.maxUnavailable -}}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -19,9 +22,29 @@ spec:
   {{- end }}
   {{- if .Values.persistence.enabled }}
   # R19: Recreate (not RollingUpdate) so the old pod detaches the RWO volume
-  # before the new one attaches it.
+  # before the new one attaches it. Wins over any configured updateStrategy
+  # (R41) below.
   strategy:
     type: Recreate
+  {{- else if or (ne $maxSurge "") (ne $maxUnavailable "") }}
+  # R41: configurable RollingUpdate surge/unavailable bounds.
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      {{- if ne $maxSurge "" }}
+      maxSurge: {{ .Values.updateStrategy.maxSurge }}
+      {{- end }}
+      {{- if ne $maxUnavailable "" }}
+      maxUnavailable: {{ .Values.updateStrategy.maxUnavailable }}
+      {{- end }}
+  {{- end }}
+  {{- with .Values.revisionHistoryLimit }}
+  # R41: bounds retained old ReplicaSets for rollback.
+  revisionHistoryLimit: {{ . }}
+  {{- end }}
+  {{- with .Values.minReadySeconds }}
+  # R41: minimum ready time before a new pod counts as available.
+  minReadySeconds: {{ . }}
   {{- end }}
   selector:
     matchLabels:
