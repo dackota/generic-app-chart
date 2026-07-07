@@ -8,10 +8,19 @@ tests:
       - hasDocuments:
           count: 0
 
+  - it: renders no PDB when replicaCount is 1 (the default), even when pdb.enabled (R44)
+    set:
+      pdb:
+        enabled: true
+    asserts:
+      - hasDocuments:
+          count: 0
+
   - it: renders a PDB with the default minAvailable and a selector matching the pods when enabled (R26)
     release:
       name: my-app
     set:
+      replicaCount: 2
       pdb:
         enabled: true
     asserts:
@@ -33,6 +42,7 @@ tests:
 
   - it: honors an overridden minAvailable (R26)
     set:
+      replicaCount: 2
       pdb:
         enabled: true
         minAvailable: 3
@@ -43,6 +53,7 @@ tests:
 
   - it: uses maxUnavailable instead of minAvailable when set, since they are mutually exclusive (R26)
     set:
+      replicaCount: 2
       pdb:
         enabled: true
         maxUnavailable: 2
@@ -52,3 +63,39 @@ tests:
           value: 2
       - notExists:
           path: spec.minAvailable
+
+  - it: renders no PDB when persistence forces a single replica, even with a higher replicaCount and pdb.enabled (R44)
+    set:
+      replicaCount: 4
+      persistence:
+        enabled: true
+      pdb:
+        enabled: true
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders the PDB when autoscaling's minReplicas floors the effective replica count above 1 (R44)
+    set:
+      autoscaling:
+        enabled: true
+        minReplicas: 3
+      pdb:
+        enabled: true
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: spec.minAvailable
+          value: 1
+
+  - it: renders no PDB when autoscaling's minReplicas is 1, even with pdb.enabled (R44)
+    set:
+      autoscaling:
+        enabled: true
+        minReplicas: 1
+      pdb:
+        enabled: true
+    asserts:
+      - hasDocuments:
+          count: 0

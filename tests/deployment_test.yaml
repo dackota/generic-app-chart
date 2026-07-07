@@ -280,6 +280,160 @@ tests:
           path: spec.template.metadata.annotations["checksum/config"]
           value: 5dca1b4971fcf24f18b601f3ea7006249acb16174bd63afaf610e21e07b4bccf
 
+  - it: omits nodeSelector when unset (R38)
+    template: deployment.yaml
+    asserts:
+      - notExists:
+          path: spec.template.spec.nodeSelector
+
+  - it: renders nodeSelector verbatim when set (R38)
+    template: deployment.yaml
+    set:
+      nodeSelector:
+        disktype: ssd
+        kubernetes.io/arch: amd64
+    asserts:
+      - equal:
+          path: spec.template.spec.nodeSelector
+          value:
+            disktype: ssd
+            kubernetes.io/arch: amd64
+
+  - it: omits tolerations when unset (R38)
+    template: deployment.yaml
+    asserts:
+      - notExists:
+          path: spec.template.spec.tolerations
+
+  - it: renders tolerations verbatim when set (R38)
+    template: deployment.yaml
+    set:
+      tolerations:
+        - key: dedicated
+          operator: Equal
+          value: gpu
+          effect: NoSchedule
+    asserts:
+      - equal:
+          path: spec.template.spec.tolerations
+          value:
+            - key: dedicated
+              operator: Equal
+              value: gpu
+              effect: NoSchedule
+
+  - it: omits priorityClassName when unset (R38)
+    template: deployment.yaml
+    asserts:
+      - notExists:
+          path: spec.template.spec.priorityClassName
+
+  - it: renders priorityClassName when set (R38)
+    template: deployment.yaml
+    set:
+      priorityClassName: high-priority
+    asserts:
+      - equal:
+          path: spec.template.spec.priorityClassName
+          value: high-priority
+
+  - it: omits topologySpreadConstraints when unset (R38)
+    template: deployment.yaml
+    asserts:
+      - notExists:
+          path: spec.template.spec.topologySpreadConstraints
+
+  - it: renders topologySpreadConstraints verbatim when set (R38)
+    template: deployment.yaml
+    set:
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: generic-app-chart
+    asserts:
+      - equal:
+          path: spec.template.spec.topologySpreadConstraints
+          value:
+            - maxSkew: 1
+              topologyKey: topology.kubernetes.io/zone
+              whenUnsatisfiable: DoNotSchedule
+              labelSelector:
+                matchLabels:
+                  app.kubernetes.io/name: generic-app-chart
+
+  - it: omits affinity when unset and replicaCount is 1 (R38)
+    template: deployment.yaml
+    asserts:
+      - notExists:
+          path: spec.template.spec.affinity
+
+  - it: renders a custom affinity verbatim when set, even with replicaCount > 1 (R38)
+    template: deployment.yaml
+    set:
+      replicaCount: 3
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: kubernetes.io/arch
+                    operator: In
+                    values: ["amd64"]
+    asserts:
+      - equal:
+          path: spec.template.spec.affinity
+          value:
+            nodeAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                nodeSelectorTerms:
+                  - matchExpressions:
+                      - key: kubernetes.io/arch
+                        operator: In
+                        values: ["amd64"]
+
+  - it: injects a default preferred pod anti-affinity across hostname when replicaCount > 1 and no affinity is set (R38)
+    template: deployment.yaml
+    release:
+      name: my-app
+    set:
+      replicaCount: 3
+    asserts:
+      - equal:
+          path: spec.template.spec.affinity.podAntiAffinity.preferredDuringSchedulingIgnoredDuringExecution[0].weight
+          value: 100
+      - equal:
+          path: spec.template.spec.affinity.podAntiAffinity.preferredDuringSchedulingIgnoredDuringExecution[0].podAffinityTerm.topologyKey
+          value: kubernetes.io/hostname
+      - equal:
+          path: spec.template.spec.affinity.podAntiAffinity.preferredDuringSchedulingIgnoredDuringExecution[0].podAffinityTerm.labelSelector.matchLabels["app.kubernetes.io/name"]
+          value: generic-app-chart
+      - equal:
+          path: spec.template.spec.affinity.podAntiAffinity.preferredDuringSchedulingIgnoredDuringExecution[0].podAffinityTerm.labelSelector.matchLabels["app.kubernetes.io/instance"]
+          value: my-app
+      - notExists:
+          path: spec.template.spec.affinity.podAntiAffinity.requiredDuringSchedulingIgnoredDuringExecution
+
+  - it: does not inject the default anti-affinity when a custom affinity is supplied, even with replicaCount > 1 (R38)
+    template: deployment.yaml
+    set:
+      replicaCount: 3
+      affinity:
+        nodeAffinity: {}
+    asserts:
+      - notExists:
+          path: spec.template.spec.affinity.podAntiAffinity
+
+  - it: does not inject a default anti-affinity when replicaCount <= 1 (R38)
+    template: deployment.yaml
+    set:
+      replicaCount: 1
+    asserts:
+      - notExists:
+          path: spec.template.spec.affinity
+
   - it: changes the checksum when config content changes (R17)
     template: deployment.yaml
     release:

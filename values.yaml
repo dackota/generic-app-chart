@@ -80,6 +80,18 @@ resources:
     cpu: 500m
     memory: 256Mi
 
+# R38: native nodeSelector/tolerations/priorityClassName/
+# topologySpreadConstraints/affinity passthrough — each omitted from the pod
+# spec unless set. When affinity is left unset and replicaCount > 1, the
+# chart injects a default soft (preferred) pod anti-affinity across
+# kubernetes.io/hostname instead (see deployment.yaml) — set affinity
+# explicitly to opt out of that default.
+nodeSelector: {}
+tolerations: []
+priorityClassName: ""
+topologySpreadConstraints: []
+affinity: {}
+
 # R14: a dedicated ServiceAccount per app; set create: false and name to reuse
 # an existing one instead.
 serviceAccount:

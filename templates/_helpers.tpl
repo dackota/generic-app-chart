@@ -59,6 +59,25 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
 {{/*
+M8 scaling & disruption — R44. The replica count actually in effect once the
+persistence/autoscaling coupling (deployment.yaml) is applied: persistence
+pins it to 1 (R19, a Longhorn RWO volume can only attach to one pod),
+autoscaling floors it at minReplicas (R25, the HPA owns the count from there),
+otherwise the static replicaCount applies. Used to gate the PDB (pdb.yaml) so
+a minAvailable/maxUnavailable budget can never target a single-replica
+workload, which would deadlock a node drain.
+*/}}
+{{- define "generic-app-chart.effectiveReplicaCount" -}}
+{{- if .Values.persistence.enabled -}}
+1
+{{- else if .Values.autoscaling.enabled -}}
+{{- .Values.autoscaling.minReplicas -}}
+{{- else -}}
+{{- .Values.replicaCount -}}
+{{- end -}}
+{{- end }}
+
+{{/*
 Name of the ServiceAccount the Deployment runs as (R14). When
 serviceAccount.create is true (default), this is the dedicated SA this chart
 creates — named after the fullname unless overridden. When false, it
