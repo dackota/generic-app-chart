@@ -1,0 +1,33 @@
+{{/*
+M5 networking — R23. Authorizes the Gateway's namespace to reach this
+namespace's Service (HTTPRoute backendRef) and, when TLS is enabled, the
+specific Secret the Certificate targets — only needed, and only rendered,
+when the Gateway lives in a different namespace than this release; omitted
+entirely in cluster-only mode (R24) or when the Gateway shares this
+namespace. Each `to` entry is scoped by `name` to this app's own Service/
+Secret — never a blanket namespace-wide grant — so the grant can't be
+reused to reach unrelated resources that land in the same namespace later.
+*/}}
+{{- if and .Values.routing.enabled (ne (include "generic-app-chart.gatewayNamespace" .) .Release.Namespace) }}
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: ReferenceGrant
+metadata:
+  name: {{ include "generic-app-chart.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "generic-app-chart.labels" . | nindent 4 }}
+spec:
+  from:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      namespace: {{ include "generic-app-chart.gatewayNamespace" . }}
+  to:
+    - group: ""
+      kind: Service
+      name: {{ include "generic-app-chart.fullname" . }}
+    {{- if .Values.routing.tls.enabled }}
+    - group: ""
+      kind: Secret
+      name: {{ include "generic-app-chart.tlsSecretName" . }}
+    {{- end }}
+{{- end }}

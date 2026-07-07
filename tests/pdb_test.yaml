@@ -1,0 +1,54 @@
+# M8 scaling & disruption — PodDisruptionBudget (pdb.yaml) — R26.
+suite: generic-app-chart PodDisruptionBudget (M8)
+templates:
+  - pdb.yaml
+tests:
+  - it: renders no PDB when disabled
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders a PDB with the default minAvailable and a selector matching the pods when enabled (R26)
+    release:
+      name: my-app
+    set:
+      pdb:
+        enabled: true
+    asserts:
+      - isKind:
+          of: PodDisruptionBudget
+      - isAPIVersion:
+          of: policy/v1
+      - equal:
+          path: spec.minAvailable
+          value: 1
+      - notExists:
+          path: spec.maxUnavailable
+      - equal:
+          path: spec.selector.matchLabels["app.kubernetes.io/name"]
+          value: generic-app-chart
+      - equal:
+          path: spec.selector.matchLabels["app.kubernetes.io/instance"]
+          value: my-app
+
+  - it: honors an overridden minAvailable (R26)
+    set:
+      pdb:
+        enabled: true
+        minAvailable: 3
+    asserts:
+      - equal:
+          path: spec.minAvailable
+          value: 3
+
+  - it: uses maxUnavailable instead of minAvailable when set, since they are mutually exclusive (R26)
+    set:
+      pdb:
+        enabled: true
+        maxUnavailable: 2
+    asserts:
+      - equal:
+          path: spec.maxUnavailable
+          value: 2
+      - notExists:
+          path: spec.minAvailable

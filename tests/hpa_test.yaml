@@ -1,0 +1,68 @@
+# M8 scaling & disruption — HorizontalPodAutoscaler (hpa.yaml) — R25.
+suite: generic-app-chart HorizontalPodAutoscaler (M8)
+templates:
+  - hpa.yaml
+tests:
+  - it: renders no HPA when autoscaling is disabled
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders an HPA with minReplicas/maxReplicas and CPU/memory targets when autoscaling is enabled (R25)
+    release:
+      name: my-app
+    set:
+      autoscaling:
+        enabled: true
+        minReplicas: 3
+        maxReplicas: 10
+        targetCPUUtilizationPercentage: 70
+        targetMemoryUtilizationPercentage: 80
+    asserts:
+      - isKind:
+          of: HorizontalPodAutoscaler
+      - isAPIVersion:
+          of: autoscaling/v2
+      - equal:
+          path: spec.scaleTargetRef
+          value:
+            apiVersion: apps/v1
+            kind: Deployment
+            name: my-app-generic-app-chart
+      - equal:
+          path: spec.minReplicas
+          value: 3
+      - equal:
+          path: spec.maxReplicas
+          value: 10
+      - contains:
+          path: spec.metrics
+          content:
+            type: Resource
+            resource:
+              name: cpu
+              target:
+                type: Utilization
+                averageUtilization: 70
+      - contains:
+          path: spec.metrics
+          content:
+            type: Resource
+            resource:
+              name: memory
+              target:
+                type: Utilization
+                averageUtilization: 80
+
+  - it: omits the memory target when targetMemoryUtilizationPercentage is unset
+    set:
+      autoscaling:
+        enabled: true
+    asserts:
+      - notContains:
+          path: spec.metrics
+          content:
+            type: Resource
+            resource:
+              name: memory
+          any: true

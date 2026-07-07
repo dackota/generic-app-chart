@@ -1,15 +1,22 @@
 # R31: named scenario values files exercise the whole rendered surface
 # together, rather than each module in isolation. `default.yaml` is the
-# minimal/base case; `persistent.yaml` is the persistence-enabled case. (The
-# remaining scenario files named in the PRD — autoscaling, networkpolicy,
-# cluster-only, full — belong to the networking-operational-addons task,
-# which builds the features they exercise; not stubbed here.)
+# minimal/base case; `persistent.yaml` is the persistence-enabled case;
+# `autoscaling.yaml`, `networkpolicy.yaml`, `cluster-only.yaml`, and
+# `full.yaml` exercise the networking-operational-addons task's routing/TLS,
+# HPA, PDB, and NetworkPolicy paths.
 suite: generic-app-chart scenario values files (R31)
 templates:
   - deployment.yaml
   - service.yaml
   - serviceaccount.yaml
+  - configmap.yaml
   - pvc.yaml
+  - hpa.yaml
+  - pdb.yaml
+  - networkpolicy.yaml
+  - httproute.yaml
+  - certificate.yaml
+  - referencegrant.yaml
 tests:
   - it: renders a coherent app from the default scenario
     values:
@@ -60,3 +67,90 @@ tests:
             name: data
           any: true
         template: deployment.yaml
+
+  - it: renders a scaling, autoscaled app from the autoscaling scenario
+    values:
+      - ./values/autoscaling.yaml
+    asserts:
+      - containsDocument:
+          kind: HorizontalPodAutoscaler
+          apiVersion: autoscaling/v2
+        template: hpa.yaml
+      - notExists:
+          path: spec.replicas
+        template: deployment.yaml
+      - hasDocuments:
+          count: 0
+        template: pvc.yaml
+
+  - it: renders a network-isolated app from the networkpolicy scenario
+    values:
+      - ./values/networkpolicy.yaml
+    asserts:
+      - containsDocument:
+          kind: NetworkPolicy
+          apiVersion: networking.k8s.io/v1
+        template: networkpolicy.yaml
+      - contains:
+          path: spec.policyTypes
+          content: Ingress
+        template: networkpolicy.yaml
+
+  - it: renders an internal, network-isolated app with no routing surface from the cluster-only scenario
+    values:
+      - ./values/cluster-only.yaml
+    asserts:
+      - containsDocument:
+          kind: Service
+          apiVersion: v1
+        template: service.yaml
+      - containsDocument:
+          kind: NetworkPolicy
+          apiVersion: networking.k8s.io/v1
+        template: networkpolicy.yaml
+      - hasDocuments:
+          count: 0
+        template: httproute.yaml
+      - hasDocuments:
+          count: 0
+        template: certificate.yaml
+      - hasDocuments:
+          count: 0
+        template: referencegrant.yaml
+
+  - it: renders every feature together from the full scenario, honoring the cross-namespace ReferenceGrant
+    release:
+      namespace: ctd
+    values:
+      - ./values/full.yaml
+    asserts:
+      - containsDocument:
+          kind: HTTPRoute
+          apiVersion: gateway.networking.k8s.io/v1
+        template: httproute.yaml
+      - containsDocument:
+          kind: Certificate
+          apiVersion: cert-manager.io/v1
+        template: certificate.yaml
+      - containsDocument:
+          kind: ReferenceGrant
+          apiVersion: gateway.networking.k8s.io/v1beta1
+        template: referencegrant.yaml
+      - containsDocument:
+          kind: HorizontalPodAutoscaler
+          apiVersion: autoscaling/v2
+        template: hpa.yaml
+      - containsDocument:
+          kind: PodDisruptionBudget
+          apiVersion: policy/v1
+        template: pdb.yaml
+      - containsDocument:
+          kind: NetworkPolicy
+          apiVersion: networking.k8s.io/v1
+        template: networkpolicy.yaml
+      - notExists:
+          path: spec.replicas
+        template: deployment.yaml
+      - hasDocuments:
+          count: 0
+        template: pvc.yaml
