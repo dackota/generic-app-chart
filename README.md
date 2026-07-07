@@ -103,15 +103,29 @@ exclusive by construction: `templates/hpa.yaml` never renders while
 ## Routing, TLS, and cluster-only mode
 
 Set `routing.enabled: true` to expose the app through the lab's one shared
-Traefik Gateway: an `HTTPRoute` is rendered with `routing.hostnames`, a
-`parentRef` to `routing.gateway.{name,namespace,sectionName}`, and a
-`backendRef` to this chart's Service. TLS is issued automatically
-(`routing.tls.enabled: true` by default) via a cert-manager `Certificate`
-against the `letsencrypt` `ClusterIssuer`, targeting `routing.tls.secretName`
-(defaults to `<fullname>-tls`). When the Gateway's namespace differs from the
-release namespace, a `ReferenceGrant` is rendered automatically authorizing
-that namespace to reach this namespace's Service and Secret; it is omitted
-when they're the same namespace.
+Traefik Gateway: an `HTTPRoute` is rendered **in this app's own namespace**
+with `routing.hostnames`, a `parentRef` to
+`routing.gateway.{name,namespace,sectionName}`, and a `backendRef` to this
+chart's own Service — same-namespace, so it needs no cross-namespace grant.
+TLS is issued automatically (`routing.tls.enabled: true` by default) via a
+cert-manager `Certificate`, also in this app's own namespace, against the
+configured `issuerRef`, targeting `routing.tls.secretName` (defaults to
+`<fullname>-tls`).
+
+This is the Gateway API project's own documented multi-tenancy pattern (ADR
+0001): apps self-serve their own Route + Certificate; the platform's shared
+Gateway opts in via `allowedRoutes` on its listener(s) and only needs a
+`ReferenceGrant` for the one genuinely cross-namespace reference this
+creates — its own listener reading this app's TLS Secret. That
+`ReferenceGrant` is rendered automatically when TLS is enabled and the
+Gateway's namespace differs from the release namespace; omitted when they're
+the same namespace or TLS is off.
+
+**Platform prerequisite, outside this chart's control:** the shared Gateway's
+listener(s) must set `allowedRoutes: {namespaces: {from: All}}` (or a
+narrower `Selector`) for this app's own-namespace `HTTPRoute` to attach at
+all, and each new app's Certificate Secret name must be added to that
+listener's own `certificateRefs` list.
 
 Leaving `routing.enabled: false` (the default) is cluster-only mode: no
 HTTPRoute/Certificate/ReferenceGrant renders, while the Service keeps

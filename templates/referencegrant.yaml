@@ -1,14 +1,16 @@
 {{/*
-M5 networking — R23. Authorizes the Gateway's namespace to reach this
-namespace's Service (HTTPRoute backendRef) and, when TLS is enabled, the
-specific Secret the Certificate targets — only needed, and only rendered,
-when the Gateway lives in a different namespace than this release; omitted
-entirely in cluster-only mode (R24) or when the Gateway shares this
-namespace. Each `to` entry is scoped by `name` to this app's own Service/
-Secret — never a blanket namespace-wide grant — so the grant can't be
-reused to reach unrelated resources that land in the same namespace later.
+M5 networking — R23 (ADR 0001: app-owned HTTPRoute/Certificate, Gateway-side
+ReferenceGrant for cross-namespace TLS only). This chart's HTTPRoute and
+Certificate live in the app's own release namespace, so the Route's
+backendRef to this chart's own Service never crosses a namespace boundary and
+needs no grant. The one cross-namespace reference this model creates is the
+Gateway's own listener `certificateRefs` reading this namespace's TLS
+Secret — authorized here, and only when TLS is actually enabled (no Secret
+exists to grant otherwise) and the Gateway lives in a different namespace
+than this release (omitted entirely in cluster-only mode, R24, or when the
+Gateway shares this namespace).
 */}}
-{{- if and .Values.routing.enabled (ne (include "generic-app-chart.gatewayNamespace" .) .Release.Namespace) }}
+{{- if and .Values.routing.enabled .Values.routing.tls.enabled (ne (include "generic-app-chart.gatewayNamespace" .) .Release.Namespace) }}
 apiVersion: gateway.networking.k8s.io/v1beta1
 kind: ReferenceGrant
 metadata:
@@ -23,11 +25,6 @@ spec:
       namespace: {{ include "generic-app-chart.gatewayNamespace" . }}
   to:
     - group: ""
-      kind: Service
-      name: {{ include "generic-app-chart.fullname" . }}
-    {{- if .Values.routing.tls.enabled }}
-    - group: ""
       kind: Secret
       name: {{ include "generic-app-chart.tlsSecretName" . }}
-    {{- end }}
 {{- end }}

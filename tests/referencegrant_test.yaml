@@ -1,8 +1,12 @@
-# M5 networking — ReferenceGrant (referencegrant.yaml) — R23, R24.
-# R23 property test: the ReferenceGrant must render if and only if routing is
-# enabled AND the Gateway's namespace differs from the release namespace.
-# Table covers the three adversarial namespace relationships in one suite so a
-# fix to one case can't silently regress the others.
+# M5 networking — ReferenceGrant (referencegrant.yaml) — R23, R24 (ADR 0001).
+# R23 property test: the ReferenceGrant must render if and only if routing AND
+# TLS are both enabled AND the Gateway's namespace differs from the release
+# namespace — it exists solely to authorize the Gateway's cross-namespace
+# certificateRefs read of this app's TLS Secret (ADR 0001: app-owned
+# HTTPRoute/Certificate means the Service backendRef is same-namespace and
+# never needs a grant). Table covers the adversarial namespace/TLS
+# combinations in one suite so a fix to one case can't silently regress
+# another.
 suite: generic-app-chart ReferenceGrant (M5)
 templates:
   - referencegrant.yaml
@@ -36,7 +40,23 @@ tests:
       - hasDocuments:
           count: 0
 
-  - it: renders a ReferenceGrant scoped by name to this app's own Service/Secret when namespaces differ and TLS is enabled (R23)
+  - it: renders no ReferenceGrant when namespaces differ but TLS is disabled — no Secret exists to grant, and the Service never needs one (R23, ADR 0001)
+    release:
+      name: my-app
+      namespace: my-app-ns
+    set:
+      routing:
+        enabled: true
+        hostnames: ["my-app.dackota.dev"]
+        gateway:
+          namespace: traefik
+        tls:
+          enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders a ReferenceGrant scoped by name to only this app's TLS Secret when namespaces differ and TLS is enabled (R23, ADR 0001)
     release:
       name: my-app
       namespace: my-app-ns
@@ -60,43 +80,15 @@ tests:
             - group: gateway.networking.k8s.io
               kind: Gateway
               namespace: traefik
-      - contains:
+      - equal:
           path: spec.to
-          content:
-            group: ""
-            kind: Service
-            name: my-app-generic-app-chart
-      - contains:
-          path: spec.to
-          content:
-            group: ""
-            kind: Secret
-            name: my-app-generic-app-chart-tls
-
-  - it: omits the Secret grant when namespaces differ but TLS is disabled — no Secret exists to justify the grant (R23)
-    release:
-      name: my-app
-      namespace: my-app-ns
-    set:
-      routing:
-        enabled: true
-        hostnames: ["my-app.dackota.dev"]
-        gateway:
-          namespace: traefik
-        tls:
-          enabled: false
-    asserts:
-      - hasDocuments:
-          count: 1
-      - contains:
-          path: spec.to
-          content:
-            group: ""
-            kind: Service
-            name: my-app-generic-app-chart
+          value:
+            - group: ""
+              kind: Secret
+              name: my-app-generic-app-chart-tls
       - notContains:
           path: spec.to
           content:
             group: ""
-            kind: Secret
-            name: my-app-generic-app-chart-tls
+            kind: Service
+            name: my-app-generic-app-chart
