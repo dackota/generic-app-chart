@@ -404,3 +404,23 @@ tests:
           path: spec.strategy.rollingUpdate.maxSurge
       - notExists:
           path: spec.strategy.rollingUpdate.maxUnavailable
+
+  # Regression: nulling the PARENT key (not just a leaf) must not crash the
+  # whole render. `.Values.updateStrategy.maxSurge` dereferences through
+  # `.Values.updateStrategy`, and Helm's merge drops the `updateStrategy` key
+  # entirely when a caller sets it to `null` (same "kindIs invalid" signal as
+  # any other unset key) — so a direct `.Values.updateStrategy.maxSurge`
+  # access panics evaluating a field on a nil value before isSet ever runs on
+  # the result. `dig` must short-circuit through the nil parent instead of
+  # dereferencing it.
+  - it: omits the RollingUpdate strategy and does not crash when the updateStrategy parent itself is set to null (R41)
+    template: deployment.yaml
+    set:
+      updateStrategy: null
+    asserts:
+      - notExists:
+          path: spec.strategy.rollingUpdate
+      - notExists:
+          path: spec.strategy.rollingUpdate.maxSurge
+      - notExists:
+          path: spec.strategy.rollingUpdate.maxUnavailable

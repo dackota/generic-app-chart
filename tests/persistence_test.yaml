@@ -134,3 +134,21 @@ tests:
           value: Recreate
       - notExists:
           path: spec.strategy.rollingUpdate
+
+  # Regression: nulling the updateStrategy PARENT must not crash the render
+  # even when persistence is enabled and updateStrategy is irrelevant to the
+  # outcome (R19 always overrides R41 before updateStrategy is ever read for
+  # rendering) — the field still gets dereferenced while computing
+  # $maxSurgeSet/$maxUnavailableSet, so this path must be dig-safe too.
+  - it: keeps strategy Recreate and does not crash when persistence is enabled and updateStrategy is set to null (R19 wins over R41)
+    template: deployment.yaml
+    set:
+      persistence:
+        enabled: true
+      updateStrategy: null
+    asserts:
+      - equal:
+          path: spec.strategy.type
+          value: Recreate
+      - notExists:
+          path: spec.strategy.rollingUpdate
