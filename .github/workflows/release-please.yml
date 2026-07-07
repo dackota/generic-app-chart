@@ -58,6 +58,11 @@ jobs:
             exit 0
           fi
 
+          if ! parsed=$(echo "$PRS_JSON" | jq -c '.[]'); then
+            echo "::error::failed to parse PRS_JSON as a JSON array"
+            exit 1
+          fi
+
           failed=0
           while read -r pr; do
             number=$(echo "$pr" | jq -r '.number')
@@ -68,7 +73,7 @@ jobs:
               failed=1
             fi
             echo "::endgroup::"
-          done < <(echo "$PRS_JSON" | jq -c '.[]')
+          done <<< "$parsed"
 
           if [ "$failed" -ne 0 ]; then
             exit 1
