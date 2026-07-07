@@ -440,3 +440,72 @@ tests:
       - equal:
           path: spec.template.metadata.annotations["vault.hashicorp.com/agent-inject"]
           value: "true"
+
+  # R40 observability surface: Prometheus scrape annotations, rendered via
+  # the R39 podAnnotations mechanism.
+  - it: omits Prometheus scrape annotations when metrics.scrape is disabled by default (R40)
+    template: deployment.yaml
+    asserts:
+      - notExists:
+          path: spec.template.metadata.annotations["prometheus.io/scrape"]
+
+  - it: renders prometheus.io/scrape|port|path pod annotations when metrics.scrape is enabled (R40)
+    template: deployment.yaml
+    set:
+      metrics:
+        scrape:
+          enabled: true
+          port: 9797
+          path: /custom-metrics
+    asserts:
+      - equal:
+          path: spec.template.metadata.annotations["prometheus.io/scrape"]
+          value: "true"
+      - equal:
+          path: spec.template.metadata.annotations["prometheus.io/port"]
+          value: "9797"
+      - equal:
+          path: spec.template.metadata.annotations["prometheus.io/path"]
+          value: /custom-metrics
+
+  - it: merges scrape annotations with existing podAnnotations/commonAnnotations without dropping either (R40, R39)
+    template: deployment.yaml
+    set:
+      metrics:
+        scrape:
+          enabled: true
+      commonAnnotations:
+        team: platform
+      podAnnotations:
+        vault.hashicorp.com/agent-inject: "true"
+    asserts:
+      - equal:
+          path: spec.template.metadata.annotations["prometheus.io/scrape"]
+          value: "true"
+      - equal:
+          path: spec.template.metadata.annotations["team"]
+          value: platform
+      - equal:
+          path: spec.template.metadata.annotations["vault.hashicorp.com/agent-inject"]
+          value: "true"
+
+  # R40 property test: the metrics block must never panic the render when a
+  # caller explicitly nulls it out or an intermediate key (the
+  # "nulled-intermediate-key" bug class) — the chart must fall back to its
+  # off-by-default behavior instead of crashing.
+  - it: never panics and stays off by default when metrics is explicitly nulled (R40 robustness)
+    template: deployment.yaml
+    set:
+      metrics: null
+    asserts:
+      - notExists:
+          path: spec.template.metadata.annotations["prometheus.io/scrape"]
+
+  - it: never panics and stays off by default when metrics.scrape is explicitly nulled (R40 robustness)
+    template: deployment.yaml
+    set:
+      metrics:
+        scrape: null
+    asserts:
+      - notExists:
+          path: spec.template.metadata.annotations["prometheus.io/scrape"]

@@ -17,6 +17,7 @@ templates:
   - httproute.yaml
   - certificate.yaml
   - referencegrant.yaml
+  - servicemonitor.yaml
 tests:
   - it: renders a coherent app from the default scenario
     values:
@@ -154,6 +155,14 @@ tests:
       - hasDocuments:
           count: 0
         template: pvc.yaml
+      - containsDocument:
+          kind: ServiceMonitor
+          apiVersion: monitoring.coreos.com/v1
+        template: servicemonitor.yaml
+      - equal:
+          path: spec.template.metadata.annotations["prometheus.io/scrape"]
+          value: "true"
+        template: deployment.yaml
 
   # R39: the full scenario also carries commonLabels/commonAnnotations,
   # podAnnotations/podLabels, and serviceAnnotations — proving the generic
@@ -209,6 +218,10 @@ tests:
           path: metadata.labels["cost-center"]
           value: ctd
         template: referencegrant.yaml
+      - equal:
+          path: metadata.labels["cost-center"]
+          value: ctd
+        template: servicemonitor.yaml
       - equal:
           path: spec.template.metadata.labels["tier"]
           value: web

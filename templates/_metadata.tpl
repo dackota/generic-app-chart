@@ -45,12 +45,38 @@ beat podLabels for the same key, backwards from the intended precedence.
 {{- end }}
 
 {{/*
+Prometheus scrape annotations (R40): prometheus.io/scrape|port|path,
+rendered only when .Values.metrics.scrape.enabled. Guards against the
+"nulled-intermediate-key" panic class by defaulting .Values.metrics and its
+.scrape sub-key to an empty dict before reading .enabled/.port/.path, so an
+explicit `metrics: null` or `metrics.scrape: null` override falls back to
+off rather than crashing the render. Folded into
+generic-app-chart.podAnnotations below via the same merge mechanism as
+checksum/config, so it combines with — and always wins over — any
+commonAnnotations/podAnnotations the caller already set. Renders nothing
+when scrape is disabled, so callers can safely `fromYaml` the result.
+*/}}
+{{- define "generic-app-chart.scrapeAnnotations" -}}
+{{- $metrics := .Values.metrics | default dict -}}
+{{- $scrape := $metrics.scrape | default dict -}}
+{{- if $scrape.enabled }}
+prometheus.io/scrape: "true"
+prometheus.io/port: {{ $scrape.port | quote }}
+prometheus.io/path: {{ $scrape.path | quote }}
+{{- end }}
+{{- end }}
+
+{{/*
 Pod template annotations: .Values.commonAnnotations and .Values.podAnnotations
 merged with the chart-managed checksum/config annotation (R17), which is only
-present when .Values.config is set. checksum/config always wins on conflict —
-it's what forces a rollout when config data changes, so a user-supplied
-override under the same key must never be allowed to silence it. Renders
-nothing when the merged result is empty, so callers can safely `with` it.
+present when .Values.config is set, and the R40 scrape annotations above,
+which are only present when .Values.metrics.scrape.enabled. Both
+chart-derived annotation sets always win on conflict — checksum/config is
+what forces a rollout when config data changes, and the scrape annotations
+are deterministically derived from .Values.metrics.scrape — so a
+user-supplied override under either key must never be allowed to silence
+them. Renders nothing when the merged result is empty, so callers can safely
+`with` it.
 */}}
 {{- define "generic-app-chart.podAnnotations" -}}
 {{- $common := .Values.commonAnnotations | default dict -}}
@@ -58,6 +84,10 @@ nothing when the merged result is empty, so callers can safely `with` it.
 {{- $merged := mergeOverwrite (deepCopy $common) $pod -}}
 {{- if .Values.config -}}
 {{- $merged = mergeOverwrite $merged (dict "checksum/config" (include (print .Template.BasePath "/configmap.yaml") . | sha256sum)) -}}
+{{- end -}}
+{{- $scrapeAnnotations := include "generic-app-chart.scrapeAnnotations" . | fromYaml -}}
+{{- if $scrapeAnnotations -}}
+{{- $merged = mergeOverwrite $merged $scrapeAnnotations -}}
 {{- end -}}
 {{- if $merged -}}
 {{- toYaml $merged -}}

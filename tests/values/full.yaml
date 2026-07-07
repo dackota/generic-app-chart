@@ -13,9 +13,25 @@ service:
       port: 80
       targetPort: 8080
       protocol: TCP
+    - name: metrics
+      port: 9090
+      targetPort: 9090
+      protocol: TCP
 
 config:
   LOG_LEVEL: info
+
+# R40: observability surface, exercised alongside every other feature.
+metrics:
+  scrape:
+    enabled: true
+    port: 9090
+    path: /metrics
+  serviceMonitor:
+    enabled: true
+    port: metrics
+    path: /metrics
+    interval: 30s
 
 routing:
   enabled: true
