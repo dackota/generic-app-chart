@@ -361,3 +361,46 @@ tests:
           value: "25%"
       - notExists:
           path: spec.strategy.rollingUpdate.maxUnavailable
+
+  # Property/invariant: the "is this set" guard (generic-app-chart.isSet,
+  # _values.tpl) must resolve the same way for every point in this field's
+  # 3-state input space — unset, explicit 0, explicit null — because a
+  # string-based guard has already gotten two of these three states wrong
+  # across two separate fixes:
+  #   1. `{{- with .Values.X }}` (truthiness) dropped explicit 0 (falsy).
+  #   2. `toString .Values.X != ""` fixed 0 but then treated explicit null as
+  #      "set", because Sprig's toString(nil) is the literal string "<nil>"
+  #      (non-empty) — rendering a dangling `key: ` with no value.
+  # These three cases together pin that invariant for revisionHistoryLimit;
+  # "omits revisionHistoryLimit and minReadySeconds when unset (R41)" above
+  # covers state 1, "...explicitly set to 0 (R41)" above covers state 2, and
+  # this test covers state 3.
+  - it: omits revisionHistoryLimit and minReadySeconds when explicitly set to null (R41)
+    template: deployment.yaml
+    set:
+      revisionHistoryLimit: null
+      minReadySeconds: null
+    asserts:
+      - notExists:
+          path: spec.revisionHistoryLimit
+      - notExists:
+          path: spec.minReadySeconds
+
+  # Same invariant, confirmed identical across the other 3 fields sharing the
+  # generic-app-chart.isSet guard: a single explicit-null override for all 4
+  # fields must omit all 4 keys, not just revisionHistoryLimit/
+  # minReadySeconds. maxSurge/maxUnavailable's unset (see "renders only the
+  # configured half..." above) and explicit-0 (see "renders a configurable
+  # RollingUpdate strategy..." above) states were already covered; this adds
+  # their third state, closing the same 3-state grid for the sibling fields.
+  - it: omits maxSurge and maxUnavailable from the RollingUpdate strategy when explicitly set to null (R41)
+    template: deployment.yaml
+    set:
+      updateStrategy:
+        maxSurge: null
+        maxUnavailable: null
+    asserts:
+      - notExists:
+          path: spec.strategy.rollingUpdate.maxSurge
+      - notExists:
+          path: spec.strategy.rollingUpdate.maxUnavailable
