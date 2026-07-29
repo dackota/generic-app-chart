@@ -55,14 +55,10 @@ jobs:
       - name: Set up Helm
         uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
         with:
-          # Deliberately newer than release.yml's v3.15.0 packaging pin: the
-          # helm-unittest plugin below ships a plugin.yaml using `platformHooks`,
-          # which Helm 3.15 cannot parse -- it fails with "plugin is installed
-          # but unusable ... unknown field platformHooks" before a single test
-          # runs. Validating with a current Helm is also the more useful check,
-          # since ArgoCD renders this chart with its own bundled Helm rather
-          # than the one release.yml packages with.
-          version: v3.21.3
+          # Validating with a current Helm is the more useful check, since
+          # ArgoCD renders this chart with its own bundled Helm rather than
+          # the one release.yml packages with. Matches release.yml's pin.
+          version: v4.2.3
 
       - name: helm lint (every values fixture)
         run: |
@@ -82,8 +78,17 @@ jobs:
           HELM_UNITTEST_VERSION: "v1.1.2"
         run: |
           set -euo pipefail
+          # Helm v4 verifies plugin signatures by default and refuses to
+          # install a plugin whose source doesn't support it ("plugin source
+          # does not support verification") -- helm-unittest publishes no
+          # provenance/signature, so verification must be explicitly skipped.
+          # The plugin itself is still pinned to an exact version above and
+          # its release tarball checksum-verified by Helm, so this isn't
+          # trusting an unpinned or unverified download -- it's opting out of
+          # a signature scheme the upstream project doesn't participate in.
           helm plugin install https://github.com/helm-unittest/helm-unittest \
-            --version "$HELM_UNITTEST_VERSION"
+            --version "$HELM_UNITTEST_VERSION" \
+            --verify=false
           helm unittest .
 
       - name: Install kubeconform (pinned, checksum-verified)
