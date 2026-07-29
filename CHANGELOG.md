@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.1](https://github.com/dackota/generic-app-chart/compare/v0.4.0...v0.4.1) (2026-07-29)
+
+
+### Bug Fixes
+
+* **renovate:** stop silent whole-repo aborts on every run ([#16](https://github.com/dackota/generic-app-chart/issues/16)) ([b247a6c](https://github.com/dackota/generic-app-chart/commit/b247a6c1ea3a961ab1a0795196ad607c8905faf1))
+
 ## [0.4.0](https://github.com/dackota/generic-app-chart/compare/v0.3.1...v0.4.0) (2026-07-07)
 
 
