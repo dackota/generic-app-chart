@@ -769,6 +769,7 @@ tests:
   - it: adds podAnnotations to the pod template without dropping the checksum/config annotation
     template: deployment.yaml
     set:
+      configChecksumAnnotation: true
       config:
         LOG_LEVEL: debug
       podAnnotations:
