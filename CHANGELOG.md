@@ -1,5 +1,16 @@
 # Changelog
 
+## [3.0.0](https://github.com/dackota/generic-app-chart/compare/v2.0.2...v3.0.0) (2026-07-29)
+
+
+### ⚠ BREAKING CHANGES
+
+* rendered resource names change from "<release>-<chart>" to "<release>". Upgrading an existing release recreates every object, including the PVC (data loss unless persistence.existingClaim is set), and the default TLS Secret name moves from "<release>-<chart>-tls" to "<release>-tls". Existing releases can keep the old names with fullnameOverride: <release>-generic-app-chart.
+
+### Features
+
+* name rendered resources after the release only ([#34](https://github.com/dackota/generic-app-chart/issues/34)) ([15f0fa6](https://github.com/dackota/generic-app-chart/commit/15f0fa6ee50380c16c08d17dfeeb780b62d56b2c))
+
 ## [2.0.2](https://github.com/dackota/generic-app-chart/compare/v2.0.1...v2.0.2) (2026-07-29)
 
 
