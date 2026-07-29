@@ -3,26 +3,25 @@ suite: generic-app-chart PodDisruptionBudget
 templates:
   - pdb.yaml
 tests:
-  - it: renders no PDB when disabled
-    asserts:
-      - hasDocuments:
-          count: 0
-
-  - it: renders no PDB when replicaCount is 1 (the default), even when pdb.enabled
+  - it: renders no PDB when explicitly disabled, even with multiple replicas
     set:
+      replicaCount: 2
       pdb:
-        enabled: true
+        enabled: false
     asserts:
       - hasDocuments:
           count: 0
 
-  - it: renders a PDB with the default minAvailable and a selector matching the pods when enabled
+  - it: renders no PDB when replicaCount is 1 (the default), even though pdb.enabled defaults on
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders a PDB by default (pdb.enabled defaults on) with the default minAvailable, the unhealthy-pod eviction policy, and a selector matching the pods, once replicas exceed 1
     release:
       name: my-app
     set:
       replicaCount: 2
-      pdb:
-        enabled: true
     asserts:
       - isKind:
           of: PodDisruptionBudget
@@ -34,11 +33,23 @@ tests:
       - notExists:
           path: spec.maxUnavailable
       - equal:
+          path: spec.unhealthyPodEvictionPolicy
+          value: AlwaysAllow
+      - equal:
           path: spec.selector.matchLabels["app.kubernetes.io/name"]
           value: generic-app-chart
       - equal:
           path: spec.selector.matchLabels["app.kubernetes.io/instance"]
           value: my-app
+
+  - it: omits unhealthyPodEvictionPolicy when opted out with the empty-string sentinel
+    set:
+      replicaCount: 2
+      pdb:
+        unhealthyPodEvictionPolicy: ""
+    asserts:
+      - notExists:
+          path: spec.unhealthyPodEvictionPolicy
 
   - it: honors an overridden minAvailable
     set:

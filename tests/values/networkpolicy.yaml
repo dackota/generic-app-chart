@@ -1,6 +1,7 @@
-# Scenario: NetworkPolicy enabled — a security-conscious app that is
-# network-isolated by default, reachable only from the shared Traefik Gateway
-# namespace.
+# Scenario: a routed app relying on the default-on NetworkPolicy —
+# network-isolated except for its own namespace and the shared Traefik
+# Gateway namespace (the gateway allowance only renders because routing is
+# enabled), with egress locked down to DNS plus one explicit database rule.
 image:
   repository: ghcr.io/dackota/podinfo
   tag: "6.5.0"
@@ -12,9 +13,23 @@ service:
       targetPort: 9898
       protocol: TCP
 
+routing:
+  enabled: true
+  hostnames:
+    - podinfo.dackota.dev
+
 networkPolicy:
   enabled: true
   gateway:
     namespaceSelector:
       matchLabels:
         kubernetes.io/metadata.name: traefik
+  restrictEgress: true
+  additionalEgress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: database
+      ports:
+        - protocol: TCP
+          port: 5432

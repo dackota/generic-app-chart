@@ -1,8 +1,9 @@
 # Scenario: cluster-only mode — an internal service reachable only
 # from inside the cluster. routing.enabled is explicitly false (the chart
-# default) so no HTTPRoute/Certificate/ReferenceGrant renders, paired with
-# NetworkPolicy so the app is also network-isolated from everything except the
-# gateway namespace — the two features combine for "internal and locked down".
+# default) so no HTTPRoute/Certificate/ReferenceGrant renders, and the
+# default-on NetworkPolicy derives no gateway allowance from it either: the
+# app is network-isolated from everything except its own namespace —
+# "internal and locked down" by default.
 image:
   repository: ghcr.io/dackota/podinfo
   tag: "6.5.0"

@@ -2,8 +2,11 @@
 
 A reusable, security-hardened Helm chart for deploying applications on a Kubernetes cluster. Renders a complete app — Deployment, Service,
 ServiceAccount, ConfigMap, optional persistence, Gateway API routing +
-cert-manager TLS, and opt-in HPA/PDB/NetworkPolicy — from a single
+cert-manager TLS, opt-in HPA, and default-on PDB/NetworkPolicy — from a single
 `values.yaml`, with restricted-PSA security defaults applied out of the box.
+Every best-practice default is opt-out via `values.yaml`; the chart is built
+for the one-app-per-namespace model, and can optionally render the namespace
+itself with Pod Security Admission labels enforcing the restricted profile.
 
 Published to `oci://ghcr.io/dackota/charts/generic-app-chart`.
 
@@ -37,6 +40,10 @@ dependency in its own thin `Chart.yaml` plus a `values.yaml` — see the
 
 - **Deployment** (`templates/deployment.yaml`) — the workload container, built
   from `image.*`, `command`/`args`, `env`/`envFrom`, probes, and resources.
+  Set `image.digest` to pin the image by immutable digest instead of tag.
+  `initContainers`/`extraContainers` pass native Container entries through
+  verbatim (migrations, sidecars) — give each its own `securityContext`, since
+  they don't inherit the chart's container defaults.
   `imagePullSecrets` references existing image-pull Secret(s) by name for
   private-registry pulls, omitted entirely when unset. `extraVolumes`/
   `extraVolumeMounts` accept arbitrary native Volume/VolumeMount shapes (e.g. a
@@ -71,13 +78,20 @@ dependency in its own thin `Chart.yaml` plus a `values.yaml` — see the
   this release; omitted entirely when they match.
 - **HorizontalPodAutoscaler** (`templates/hpa.yaml`) — rendered when
   `autoscaling.enabled`, unless `persistence.enabled` (the two are mutually
-  exclusive by construction — see "Persistence" below).
-- **PodDisruptionBudget** (`templates/pdb.yaml`) — rendered when `pdb.enabled`,
-  using `minAvailable` by default or `maxUnavailable` when set (mutually
-  exclusive).
-- **NetworkPolicy** (`templates/networkpolicy.yaml`) — rendered when
-  `networkPolicy.enabled`; default-deny ingress except from the configured
-  gateway namespace/pods, with optional additional egress allowances.
+  exclusive by construction — see "Persistence" below). `autoscaling.behavior`
+  passes native scaleUp/scaleDown behavior through verbatim.
+- **PodDisruptionBudget** (`templates/pdb.yaml`) — **on by default**
+  (`pdb.enabled: true`), but only rendered when the effective replica count
+  is > 1, so it can never deadlock a single-replica drain. Uses `minAvailable`
+  by default or `maxUnavailable` when set (mutually exclusive), plus
+  `unhealthyPodEvictionPolicy: AlwaysAllow` so a crash-looping app can't wedge
+  a node drain.
+- **NetworkPolicy** (`templates/networkpolicy.yaml`) — **on by default**
+  (`networkPolicy.enabled: true`); default-deny ingress with allowances
+  derived from what the app enables — see "NetworkPolicy" below.
+- **Namespace** (`templates/namespace.yaml`) — opt-in (`namespace.create`);
+  renders the release namespace itself with Pod Security Admission labels
+  (restricted by default) — see "Namespace-per-app" below.
 - **ServiceMonitor** (`templates/servicemonitor.yaml`) — rendered when
   `metrics.serviceMonitor.enabled`, selecting this chart's own Service on a
   named metrics port for Prometheus Operator to scrape.
@@ -97,8 +111,15 @@ Every app rendered by this chart ships restricted-PSA-compliant by default:
   (paired with an automatic `/tmp` `emptyDir` so a read-only root filesystem
   doesn't break apps that write temp files), `privileged: false`,
   `capabilities.drop: [ALL]`.
-- `automountServiceAccountToken: false` at the pod level.
+- `automountServiceAccountToken: false` at the pod level, mirrored onto the
+  ServiceAccount resource itself so any other pod reusing the SA inherits the
+  same no-token default.
+- `enableServiceLinks: false` — no legacy Docker-link env vars leaking every
+  Service in the namespace into the pod environment.
+- A default-deny-ingress **NetworkPolicy** (below).
 - Container resource `requests` and `limits` are always set.
+- Optional `image.digest` pins the image by immutable digest so deployed bits
+  can't drift under a re-pushed tag.
 
 Every one of these is **independently overridable** via
 `podSecurityContext`/`containerSecurityContext`/`automountServiceAccountToken`
@@ -145,18 +166,54 @@ Leaving `routing.enabled: false` (the default) is cluster-only mode: no
 HTTPRoute/Certificate/ReferenceGrant renders, while the Service keeps
 rendering as normal for in-cluster access.
 
-## Autoscaling, PodDisruptionBudget, and NetworkPolicy
+## Autoscaling and PodDisruptionBudget
 
 - `autoscaling.enabled: true` renders an HPA (`minReplicas`/`maxReplicas`,
-  CPU/memory target utilization); the Deployment's static `replicas` is
-  omitted once the HPA owns replica count. Mutually exclusive with
-  `persistence.enabled` (see above).
-- `pdb.enabled: true` renders a PodDisruptionBudget using `minAvailable`
-  (default `1`) or `maxUnavailable` when set.
-- `networkPolicy.enabled: true` renders a default-deny-ingress NetworkPolicy
-  that allows only the configured `networkPolicy.gateway`
-  namespace/pod-selector; `networkPolicy.additionalEgress` supplies optional
-  egress allowances (native `NetworkPolicyEgressRule` entries).
+  CPU/memory target utilization, optional native `behavior` passthrough); the
+  Deployment's static `replicas` is omitted once the HPA owns replica count.
+  Mutually exclusive with `persistence.enabled` (see above).
+- The PDB is on by default but renders only for effectively multi-replica
+  workloads (static `replicaCount` > 1 or an autoscaling floor > 1). It uses
+  `minAvailable` (default `1`) or `maxUnavailable` when set, and
+  `unhealthyPodEvictionPolicy: AlwaysAllow` (set `""` to omit). Set
+  `pdb.enabled: false` to opt out.
+
+## NetworkPolicy
+
+On by default: a default-deny-ingress NetworkPolicy scoped to this app's
+pods, with allowances **derived from what the app actually enables**:
+
+- pods in the app's own namespace (`networkPolicy.allowSameNamespace`,
+  default true — intra-app traffic under the one-app-per-namespace model);
+- the gateway namespace/pods (`networkPolicy.gateway`), only while
+  `routing.enabled` — a cluster-only app never opens a hole for the gateway;
+- the monitoring namespace (`networkPolicy.monitoring`), only while the
+  metrics surface (`metrics.scrape` or `metrics.serviceMonitor`) is enabled;
+- anything under `networkPolicy.additionalIngress` (native
+  `NetworkPolicyIngressRule` entries).
+
+Egress stays unrestricted until `networkPolicy.restrictEgress: true` or any
+`networkPolicy.additionalEgress` rule activates egress restriction; once
+active, DNS to kube-system's `kube-dns` is allowed automatically
+(`networkPolicy.allowDNS`, default true) so a locked-down app can still
+resolve names. Set `networkPolicy.enabled: false` to opt out entirely.
+
+## Namespace-per-app and Pod Security Admission
+
+The chart assumes each app lives in its own namespace. `namespace.create:
+true` (default false) additionally renders the release namespace itself,
+labeled with Pod Security Admission levels (`namespace.podSecurityStandards`,
+`restricted` for enforce/audit/warn by default) — so the restricted posture
+the chart renders into pod specs is also *enforced* by the API server for
+everything in the namespace, sidecars and manual `kubectl run` included.
+
+It is opt-in because namespace ownership can't be assumed: with plain
+`helm install --create-namespace` or a pre-created namespace, Helm cannot
+adopt the existing object, and `helm uninstall` deletes a chart-owned
+namespace with everything in it. Under ArgoCD, either enable it (the
+Application then owns the namespace) or keep using
+`CreateNamespace=true` with `managedNamespaceMetadata` to apply the PSA
+labels instead.
 
 ## Observability surface
 
@@ -229,6 +286,16 @@ visibility to **public** by hand in GitHub (Package settings → Change
 visibility) — this cannot be done from a workflow file, and its absence is
 not a CI failure.
 
+## Values validation
+
+`values.schema.json` validates values at lint/install/upgrade time: top-level
+keys are closed (a typo'd key fails fast instead of silently rendering a
+default), enums are enforced (`image.pullPolicy`, `service.type`,
+`pdb.unhealthyPodEvictionPolicy`, ...), and `image.digest` must be a real
+`sha256:` digest. Native-Kubernetes passthrough shapes (env, probes,
+affinity, container specs) stay open on purpose — kubeconform validates the
+rendered output against the real Kubernetes schemas in CI.
+
 ## Testing
 
 ```bash
@@ -238,10 +305,10 @@ helm unittest .
 
 Suites live under `tests/*_test.yaml` (one per module: naming/labels,
 security defaults, workload, persistence, config, service, serviceaccount,
-HTTPRoute, Certificate, ReferenceGrant, HPA, PDB, NetworkPolicy, ServiceMonitor,
-plus the never-renders-a-secret, security opt-out, cluster-only, and
-HPA<->persistence property/invariant suites). Named scenario values files
-live under `tests/values/`:
+Namespace, HTTPRoute, Certificate, ReferenceGrant, HPA, PDB, NetworkPolicy,
+ServiceMonitor, plus the never-renders-a-secret, security opt-out,
+cluster-only, and HPA<->persistence property/invariant suites). Named
+scenario values files live under `tests/values/`:
 
 - `default.yaml` — minimal/base case (stateless app).
 - `persistent.yaml` — persistence enabled (stateful app).

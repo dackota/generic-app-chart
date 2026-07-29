@@ -1,10 +1,24 @@
 {{/*
-Networkpolicy. Default-deny-ingress: only the configured gateway
-namespace/pods may reach this app; every other ingress source is denied by
-omission. Egress stays unrestricted (no Egress policyType) unless the caller
-supplies additionalEgress rules.
+Networkpolicy. Default-deny-ingress, on by default. The allowed ingress
+sources are derived from what the app actually enables — same-namespace pods
+(allowSameNamespace), the gateway namespace only while routing.enabled, the
+monitoring namespace only while the metrics surface is enabled, plus any
+additionalIngress rules — everything else is denied by omission. Egress stays
+unrestricted (no Egress policyType) until restrictEgress is set or
+additionalEgress rules are supplied; once active, DNS to kube-dns is allowed
+automatically (allowDNS) alongside the caller's own rules.
+
+Guards against the "nulled-intermediate-key" panic class the same way
+_metadata.tpl does: .Values.metrics and its sub-keys are defaulted to empty
+dicts before reading .enabled.
 */}}
 {{- if .Values.networkPolicy.enabled }}
+{{- $metrics := .Values.metrics | default dict -}}
+{{- $scrape := $metrics.scrape | default dict -}}
+{{- $serviceMonitor := $metrics.serviceMonitor | default dict -}}
+{{- $metricsEnabled := or $scrape.enabled $serviceMonitor.enabled -}}
+{{- $egressActive := or .Values.networkPolicy.restrictEgress (not (empty .Values.networkPolicy.additionalEgress)) -}}
+{{- $hasIngressRules := or .Values.networkPolicy.allowSameNamespace .Values.routing.enabled $metricsEnabled (not (empty .Values.networkPolicy.additionalIngress)) -}}
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -21,10 +35,19 @@ spec:
       {{- include "generic-app-chart.selectorLabels" . | nindent 6 }}
   policyTypes:
     - Ingress
-    {{- if .Values.networkPolicy.additionalEgress }}
+    {{- if $egressActive }}
     - Egress
     {{- end }}
+  {{- if $hasIngressRules }}
   ingress:
+    {{- if .Values.networkPolicy.allowSameNamespace }}
+    # Intra-app traffic: any pod in this app's own namespace (the
+    # one-app-per-namespace model makes this the app's own components only).
+    - from:
+        - podSelector: {}
+    {{- end }}
+    {{- if .Values.routing.enabled }}
+    # The gateway may reach this app only while a route through it exists.
     - from:
         - namespaceSelector:
             {{- toYaml .Values.networkPolicy.gateway.namespaceSelector | nindent 12 }}
@@ -32,8 +55,40 @@ spec:
           podSelector:
             {{- toYaml . | nindent 12 }}
           {{- end }}
-  {{- with .Values.networkPolicy.additionalEgress }}
-  egress:
+    {{- end }}
+    {{- if $metricsEnabled }}
+    # Prometheus may scrape only while the metrics surface is enabled.
+    - from:
+        - namespaceSelector:
+            {{- toYaml .Values.networkPolicy.monitoring.namespaceSelector | nindent 12 }}
+          {{- with .Values.networkPolicy.monitoring.podSelector }}
+          podSelector:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+    {{- end }}
+    {{- with .Values.networkPolicy.additionalIngress }}
     {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- end }}
+  {{- if and $egressActive (or .Values.networkPolicy.allowDNS (not (empty .Values.networkPolicy.additionalEgress))) }}
+  egress:
+    {{- if .Values.networkPolicy.allowDNS }}
+    # Name resolution keeps working under a locked-down egress posture.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    {{- end }}
+    {{- with .Values.networkPolicy.additionalEgress }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
   {{- end }}
 {{- end }}

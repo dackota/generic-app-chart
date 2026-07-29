@@ -133,6 +133,7 @@ spec:
       {{- end }}
       serviceAccountName: {{ include "generic-app-chart.serviceAccountName" . }}
       automountServiceAccountToken: {{ .Values.automountServiceAccountToken }}
+      enableServiceLinks: {{ .Values.enableServiceLinks }}
       terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
       securityContext:
         {{- include "generic-app-chart.podSecurityContext" . | nindent 8 }}
@@ -172,11 +173,21 @@ spec:
                   matchLabels:
                     {{- include "generic-app-chart.selectorLabels" . | nindent 20 }}
       {{- end }}
+      {{- with .Values.initContainers }}
+      initContainers:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: {{ .Chart.Name }}
           securityContext:
             {{- include "generic-app-chart.containerSecurityContext" . | nindent 12 }}
+          {{- if .Values.image.digest }}
+          # Digest pin wins over tag — the deployed bits can't drift under a
+          # re-pushed tag.
+          image: "{{ .Values.image.repository }}@{{ .Values.image.digest }}"
+          {{- else }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          {{- end }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           {{- with .Values.service.ports }}
           ports:
@@ -229,6 +240,9 @@ spec:
           volumeMounts:
             {{- . | nindent 12 }}
           {{- end }}
+        {{- with .Values.extraContainers }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
       {{- with $volumes }}
       volumes:
         {{- . | nindent 6 }}
