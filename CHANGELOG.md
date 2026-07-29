@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0](https://github.com/dackota/generic-app-chart/compare/v0.4.1...v0.5.0) (2026-07-29)
+
+
+### Features
+
+* **ci:** run the chart test suite on PRs and automerge Renovate updates ([#18](https://github.com/dackota/generic-app-chart/issues/18)) ([25d5e8f](https://github.com/dackota/generic-app-chart/commit/25d5e8f6793db9d4d80efe00bd5a49c01ce9ab9f))
+
 ## [0.4.1](https://github.com/dackota/generic-app-chart/compare/v0.4.0...v0.4.1) (2026-07-29)
 
 
