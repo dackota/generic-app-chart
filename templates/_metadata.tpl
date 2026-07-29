@@ -69,21 +69,30 @@ prometheus.io/path: {{ $scrape.path | quote }}
 {{/*
 Pod template annotations: .Values.commonAnnotations and .Values.podAnnotations
 merged with the chart-managed checksum/config annotation, which is only
-present when .Values.config is set, and the scrape annotations above,
-which are only present when .Values.metrics.scrape.enabled. Both
-chart-derived annotation sets always win on conflict — checksum/config is
-what forces a rollout when config data changes, and the scrape annotations
-are deterministically derived from .Values.metrics.scrape — so a
-user-supplied override under either key must never be allowed to silence
-them. Renders nothing when the merged result is empty, so callers can safely
-`with` it.
+present when .Values.configChecksumAnnotation is true AND .Values.config is
+set, and the scrape annotations above, which are only present when
+.Values.metrics.scrape.enabled. Both chart-derived annotation sets always win
+on conflict — checksum/config is what forces a rollout when config data
+changes, and the scrape annotations are deterministically derived from
+.Values.metrics.scrape — so a user-supplied override under either key must
+never be allowed to silence them. Renders nothing when the merged result is
+empty, so callers can safely `with` it.
+
+The checksum hashes .Values.config alone, NOT the rendered configmap.yaml.
+Hashing the rendered ConfigMap (what this did originally) folds in its
+metadata.labels, which carry `helm.sh/chart: <name>-<Chart.Version>` — so the
+hash changed on every chart version bump and rolled every pod on an upgrade
+that touched no config at all. Hashing the values directly makes the
+annotation mean what its name says: it changes when, and only when, config
+content changes. `toYaml` marshals map keys in sorted order, so the digest is
+stable across renders for identical config.
 */}}
 {{- define "generic-app-chart.podAnnotations" -}}
 {{- $common := .Values.commonAnnotations | default dict -}}
 {{- $pod := .Values.podAnnotations | default dict -}}
 {{- $merged := mergeOverwrite (deepCopy $common) $pod -}}
-{{- if .Values.config -}}
-{{- $merged = mergeOverwrite $merged (dict "checksum/config" (include (print .Template.BasePath "/configmap.yaml") . | sha256sum)) -}}
+{{- if and .Values.configChecksumAnnotation .Values.config -}}
+{{- $merged = mergeOverwrite $merged (dict "checksum/config" (.Values.config | toYaml | sha256sum)) -}}
 {{- end -}}
 {{- $scrapeAnnotations := include "generic-app-chart.scrapeAnnotations" . | fromYaml -}}
 {{- if $scrapeAnnotations -}}

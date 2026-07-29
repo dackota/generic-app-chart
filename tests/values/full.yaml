@@ -36,6 +36,10 @@ service:
 config:
   LOG_LEVEL: info
 
+# Opted in here (chart default is false) so the "every feature together"
+# scenario actually renders the checksum/config annotation.
+configChecksumAnnotation: true
+
 # Observability surface, exercised alongside every other feature.
 metrics:
   scrape:

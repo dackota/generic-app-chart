@@ -52,8 +52,9 @@ dependency in its own thin `Chart.yaml` plus a `values.yaml` — see the
 - **ServiceAccount** (`templates/serviceaccount.yaml`) — a dedicated SA per
   app by default; set `serviceAccount.create: false` to reuse an existing one.
 - **ConfigMap** (`templates/configmap.yaml`) — rendered from `config` when
-  non-empty; the Deployment carries a `checksum/config` pod annotation so
-  editing `config` triggers a rollout.
+  non-empty. Set `configChecksumAnnotation: true` to also stamp a
+  `checksum/config` pod annotation so editing `config` triggers a rollout;
+  it is **off by default** (see below).
 - **PersistentVolumeClaim** (`templates/pvc.yaml`) — an RWO Longhorn volume,
   rendered only when `persistence.enabled` and no `persistence.existingClaim`
   is supplied.
@@ -190,7 +191,29 @@ metrics, and it does not wire a custom-metric HPA off scraped values.
 
 Chart-managed keys — selector labels, `helm.sh/chart`, `app.kubernetes.io/*`,
 and the `checksum/config` rollout trigger — always win when a user-supplied
-key collides with one of them.
+key collides with one of them. (`checksum/config` is only chart-managed while
+`configChecksumAnnotation` is true; with it off there is no chart value to
+protect and a user-supplied `checksum/config` passes through untouched.)
+
+## Config rollout trigger
+
+`configChecksumAnnotation` (default `false`) controls whether the Deployment
+carries a `checksum/config` pod annotation derived from `config`.
+
+It is off by default because of how these apps are deployed. Under ArgoCD an
+always-on checksum turns every config edit into a full rollout, whether or not
+the app needs one — and most apps here either hot-reload their config or read
+it at startup on a cadence where an operator-triggered restart is fine. Turn it
+on per app when a config change genuinely must restart the process to take
+effect.
+
+The digest covers `config` and nothing else. It deliberately does **not** hash
+the rendered ConfigMap: that render carries
+`helm.sh/chart: <name>-<Chart.Version>` in its labels, so hashing it made the
+annotation change on every chart version bump and roll every pod on upgrades
+that touched no config at all — the failure mode this flag exists to end.
+Enabling the flag therefore restarts pods when config changes, not when the
+chart is upgraded.
 
 ## Publishing
 
