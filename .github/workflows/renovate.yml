@@ -15,11 +15,28 @@ name: Renovate
 #   - RENOVATE_REPOSITORIES pins the run to this repo only, so the (shared)
 #     App installation on other repos in this account can't leak into this
 #     schedule.
+#
+# Failure visibility: Renovate exits 0 even when it abandons a repository
+# mid-run. This repo hit exactly that -- every run from 2026-07-21 onward
+# aborted with "Repository has changed during renovation", leaving pushed
+# renovate/* branches whose PRs were never opened, while the workflow kept
+# reporting success. The "Assert Renovate finished cleanly" step below reads
+# Renovate's own JSON report and fails the job on any repository result other
+# than `done`, so a silent abandonment shows up as a red run.
 
 on:
   schedule:
     - cron: "0 5 * * *"
   workflow_dispatch:
+    inputs:
+      logLevel:
+        description: "Renovate log level (use debug to diagnose a bad run)"
+        required: false
+        default: "info"
+        type: choice
+        options:
+          - info
+          - debug
 
 permissions:
   contents: read
@@ -27,6 +44,7 @@ permissions:
 jobs:
   renovate:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - name: Generate a token for the dk-renovate-bot App
         id: app-token
@@ -38,11 +56,16 @@ jobs:
           # pull-requests to open update PRs, issues for the Dependency
           # Dashboard, workflows because the github-actions manager pushes
           # commits touching .github/workflows/* (a scope GitHub requires
-          # separately from contents).
+          # separately from contents), and vulnerability-alerts because
+          # `config:best-practices` enables Renovate's vulnerabilityAlerts
+          # handling -- without that scope Renovate logs "Cannot access
+          # vulnerability alerts" and skips security-driven updates entirely.
+          # Read-only: Renovate consumes alerts, it never writes them.
           permission-contents: write
           permission-pull-requests: write
           permission-issues: write
           permission-workflows: write
+          permission-vulnerability-alerts: read
 
       - name: Run Renovate
         uses: renovatebot/github-action@b50d2ba2bd928235abdcc14d06dfafc217f1c565 # v46.1.18
@@ -54,5 +77,72 @@ jobs:
           # `gh api users/dk-renovate-bot%5Bbot%5D`) for GitHub to recognize
           # it as a real account and render the App's avatar on the commit.
           RENOVATE_GIT_AUTHOR: "dk-renovate-bot[bot] <300303047+dk-renovate-bot[bot]@users.noreply.github.com>"
+          # Selectable per-run so a broken run can be re-dispatched at debug
+          # without editing this file; the scheduled run stays at info.
+          LOG_LEVEL: ${{ github.event.inputs.logLevel || 'info' }}
+          # Structured log for the assertion step below. The action invokes
+          # Renovate with `--volume /tmp:/tmp`, so a file written to /tmp
+          # inside the container lands on the runner. This is the log, not
+          # RENOVATE_REPORT_TYPE: the JSON report carries packageFiles and
+          # branches but no per-repository `result`, so it cannot distinguish
+          # a clean pass from an abandoned one -- the log's "Repository
+          # finished" record can.
+          LOG_FILE: /tmp/renovate-log.ndjson
+          LOG_FILE_LEVEL: info
         with:
           token: ${{ steps.app-token.outputs.token }}
+          # The action only forwards env vars matching this regex into the
+          # Renovate container. Reproduces the action's documented default
+          # verbatim, plus LOG_FILE/LOG_FILE_LEVEL -- without them the log
+          # above is silently never written (LOG_LEVEL is in the default,
+          # which is why debug logging worked while LOG_FILE did not).
+          env-regex: '^(?:RENOVATE_\w+|LOG_LEVEL|LOG_FILE|LOG_FILE_LEVEL|GITHUB_COM_TOKEN|NODE_OPTIONS|NO_COLOR|(?:HTTPS?|NO)_PROXY|(?:https?|no)_proxy)$'
+
+      # Renovate's exit code reflects "the process ran", not "the repository
+      # was actually processed" -- see the header note. Any repository result
+      # other than `done` means work was abandoned, so fail the job.
+      - name: Assert Renovate finished cleanly
+        if: always()
+        run: |
+          set -euo pipefail
+
+          log=/tmp/renovate-log.ndjson
+
+          if [ ! -f "$log" ]; then
+            echo "::error::Renovate wrote no log at ${log} -- it never started a repository pass."
+            exit 1
+          fi
+
+          # Renovate emits one newline-delimited JSON record per log event.
+          # The "Repository finished" record carries the outcome we care
+          # about: result is "done" on a clean pass, and something else
+          # ("repository-changed", "error", ...) when work was abandoned.
+          finished=$(jq -rc 'select(.msg == "Repository finished")' "$log" || true)
+
+          if [ -z "$finished" ]; then
+            echo "::error::Renovate never logged 'Repository finished' -- the run died before completing a repository."
+            echo "::group::last 40 log records"
+            tail -40 "$log"
+            echo "::endgroup::"
+            exit 1
+          fi
+
+          failed=0
+          while IFS= read -r record; do
+            repo=$(jq -r '.repository // "?"' <<< "$record")
+            result=$(jq -r '.result // "unknown"' <<< "$record")
+            if [ "$result" = "done" ]; then
+              echo "ok: ${repo} -> ${result}"
+            else
+              failed=1
+              echo "::error::Renovate abandoned ${repo} with result '${result}' (the job still exited 0). Re-dispatch this workflow with logLevel=debug for the underlying cause."
+            fi
+          done <<< "$finished"
+
+          # Surface anything Renovate itself flagged, even on a clean pass --
+          # a missing token scope shows up here long before it breaks a run.
+          echo "::group::Renovate warnings and errors"
+          jq -r 'select(.level >= 40) | "\(.level) \(.msg)"' "$log" || true
+          echo "::endgroup::"
+
+          exit "$failed"

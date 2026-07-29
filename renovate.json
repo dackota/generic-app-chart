@@ -4,5 +4,23 @@
   "dependencyDashboard": true,
   "automerge": false,
   "semanticCommits": "enabled",
-  "minimumReleaseAge": "5 days"
+  "minimumReleaseAge": "5 days",
+  "description": [
+    "statusCheckNames.minimumReleaseAge disables the stability commit status",
+    "Renovate would otherwise POST to repos/:owner/:repo/statuses/:sha for every",
+    "branch held by minimumReleaseAge. The dk-renovate-bot App token is scoped",
+    "without `statuses`, so that POST returned 403 integration-unauthorized,",
+    "which Renovate surfaces as REPOSITORY_CHANGED and then abandons the whole",
+    "repository -- while still exiting 0. That silently broke every run from",
+    "2026-07-21 on, leaving pushed renovate/* branches whose PRs were never",
+    "opened. Nulling the status check name is how the sibling repos",
+    "(change-tracking-dashboard, resume-website, consulting-spa) already avoid",
+    "this, and it is the least-privilege fix: it drops a cosmetic status check",
+    "rather than granting the token a new write scope. minimumReleaseAge itself",
+    "still applies -- Renovate holds the update internally; only the commit",
+    "status is suppressed."
+  ],
+  "statusCheckNames": {
+    "minimumReleaseAge": null
+  }
 }
