@@ -18,9 +18,29 @@
     "this, and it is the least-privilege fix: it drops a cosmetic status check",
     "rather than granting the token a new write scope. minimumReleaseAge itself",
     "still applies -- Renovate holds the update internally; only the commit",
-    "status is suppressed."
+    "status is suppressed.",
+    "",
+    "Automerge is gated on the validate-chart check from .github/workflows/",
+    "pr-ci.yml, which is marked required on main. That gate is load-bearing:",
+    "GitHub rejects enabling native auto-merge on a PR with nothing left to",
+    "wait for, and an ungated automerge would push chart changes to main and",
+    "out through release.yml to the registry the cluster deploys from, with",
+    "the tests/ suite never having run."
   ],
   "statusCheckNames": {
     "minimumReleaseAge": null
-  }
+  },
+  "automergeStrategy": "squash",
+  "packageRules": [
+    {
+      "description": "Auto-merge low-risk leaf-dependency updates (patch, minor, digest) once validate-chart is green -- same convention as change-tracking-dashboard and resume-website.",
+      "matchUpdateTypes": ["patch", "minor", "digest"],
+      "automerge": true
+    },
+    {
+      "description": "Never auto-merge a major bump; always leave it as a manual PR to review.",
+      "matchUpdateTypes": ["major"],
+      "automerge": false
+    }
+  ]
 }
