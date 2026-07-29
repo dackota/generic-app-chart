@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.1](https://github.com/dackota/generic-app-chart/compare/v2.0.0...v2.0.1) (2026-07-29)
+
+
+### Bug Fixes
+
+* **renovate:** trigger a run when Dependency Dashboard checkboxes are clicked ([#28](https://github.com/dackota/generic-app-chart/issues/28)) ([0c2892b](https://github.com/dackota/generic-app-chart/commit/0c2892b7e3c21285d63d976b0f48864156702172))
+
 ## [2.0.0](https://github.com/dackota/generic-app-chart/compare/v1.0.0...v2.0.0) (2026-07-29)
 
 
