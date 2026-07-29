@@ -15,20 +15,15 @@ Chart name, honoring nameOverride.
 {{- end }}
 
 {{/*
-Fully qualified resource name. Honors fullnameOverride first; otherwise
-combines the release name with the (possibly overridden) chart name, avoiding
-duplication when the release name already contains it.
+Fully qualified resource name. Honors fullnameOverride first; otherwise the
+release name is used verbatim, so rendered resources are named exactly as the
+release is (no chart-name suffix) and callers keep full control of naming.
 */}}
 {{- define "generic-app-chart.fullname" -}}
 {{- if .Values.fullnameOverride }}
 {{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
 {{- else }}
-{{- $name := default .Chart.Name .Values.nameOverride }}
-{{- if contains $name .Release.Name }}
 {{- .Release.Name | trunc 63 | trimSuffix "-" }}
-{{- else }}
-{{- printf "%s-%s" .Release.Name $name | trunc 63 | trimSuffix "-" }}
-{{- end }}
 {{- end }}
 {{- end }}
 

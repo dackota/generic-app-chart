@@ -112,7 +112,7 @@ tests:
           content:
             name: data
             persistentVolumeClaim:
-              claimName: my-app-generic-app-chart
+              claimName: my-app
 
   - it: mounts an existingClaim into the container instead of creating a PVC
     template: deployment.yaml

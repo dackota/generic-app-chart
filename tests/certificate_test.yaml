@@ -41,7 +41,7 @@ tests:
             kind: ClusterIssuer
       - equal:
           path: spec.secretName
-          value: my-app-generic-app-chart-tls
+          value: my-app-tls
 
   - it: honors an explicit secretName and issuerRef override
     set:
