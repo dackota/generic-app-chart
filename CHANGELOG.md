@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.0.0](https://github.com/dackota/generic-app-chart/compare/v1.0.0...v2.0.0) (2026-07-29)
+
+
+### ⚠ BREAKING CHANGES
+
+* default NetworkPolicy/PDB on, add namespace-per-app and digest pinning ([#24](https://github.com/dackota/generic-app-chart/issues/24))
+
+### Features
+
+* default NetworkPolicy/PDB on, add namespace-per-app and digest pinning ([#24](https://github.com/dackota/generic-app-chart/issues/24)) ([80831d1](https://github.com/dackota/generic-app-chart/commit/80831d1a00eaaad2e779fb8634b10ce9c233946a))
+
 ## [1.0.0](https://github.com/dackota/generic-app-chart/compare/v0.5.0...v1.0.0) (2026-07-29)
 
 
