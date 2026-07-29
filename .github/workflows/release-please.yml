@@ -12,6 +12,14 @@ name: release-please
 # would not re-trigger this `on: push` workflow, so release-please-action
 # would never get a chance to notice the release PR was merged and cut the
 # tag + GitHub Release that release.yml listens for.
+#
+# The release PR is merged via GitHub-native auto-merge (`--auto`) rather
+# than merged outright, because main now requires the validate-chart check
+# from pr-ci.yml. A direct merge races that check and GitHub rejects it, so
+# `--auto` hands the wait to GitHub instead. The App token matters here for
+# the same anti-recursion reason as above: native auto-merge attributes the
+# eventual merge push to whoever enabled it. See the merge step for the
+# fallback path when there is nothing to wait on.
 on:
   push:
     branches:
@@ -81,9 +89,25 @@ jobs:
             number=$(echo "$pr" | jq -r '.number')
             title=$(echo "$pr" | jq -r '.title')
             echo "::group::release PR #$number -- $title"
-            if ! gh pr merge "$number" --repo "$GITHUB_REPOSITORY" --squash --delete-branch; then
-              echo "::error::merge failed for release PR #$number"
-              failed=1
+            # --auto first. A plain `gh pr merge --squash` raced the
+            # validate-chart required check (pr-ci.yml): release-please
+            # creates the release PR and this step tries to merge it
+            # milliseconds later, long before the check reports, so GitHub
+            # rejects it with "the base branch policy prohibits the merge"
+            # and the whole release fails. That is what broke the v1.0.0
+            # release. Native auto-merge instead hands the wait to GitHub,
+            # which merges once validate-chart is green.
+            if gh pr merge "$number" --repo "$GITHUB_REPOSITORY" --auto --squash --delete-branch; then
+              echo "auto-merge enabled for #$number"
+            else
+              # --auto is rejected when there is nothing left to wait on
+              # (checks already green, or no required check configured at
+              # all). Merging directly is then both possible and correct.
+              echo "auto-merge not enabled for #$number; attempting a direct squash merge"
+              if ! gh pr merge "$number" --repo "$GITHUB_REPOSITORY" --squash --delete-branch; then
+                echo "::error::merge failed for release PR #$number"
+                failed=1
+              fi
             fi
             echo "::endgroup::"
           done <<< "$parsed"
