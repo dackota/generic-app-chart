@@ -204,6 +204,23 @@ serviceAnnotations: {}
 # Rendered into a ConfigMap when non-empty; omitted entirely otherwise.
 config: {}
 
+# Adds a `checksum/config` annotation to the pod template, derived from the
+# `config` map above, so that editing config rolls the pods.
+#
+# Off by default, because under ArgoCD an always-on checksum costs more than
+# it gives: most apps here either hot-reload their config or read it only at
+# startup on a schedule where an operator-triggered restart is fine, and the
+# annotation makes every config edit a full rollout whether or not the app
+# needed one. Turn it on per-app when a config change genuinely must restart
+# the process to take effect.
+#
+# Not a sub-key of `config` on purpose: every key under `config` becomes
+# ConfigMap data, so a flag there would render as app configuration.
+#
+# Only meaningful when `config` is non-empty — with no ConfigMap there is
+# nothing to checksum, and the annotation is omitted regardless of this flag.
+configChecksumAnnotation: false
+
 # An RWO Longhorn PVC. Enabling it forces the Deployment to
 # `strategy: Recreate` + `replicas: 1` (see deployment.yaml) since a Longhorn
 # RWO volume cannot be multi-attached during a rollout, and it must never be

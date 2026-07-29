@@ -415,15 +415,48 @@ tests:
           path: spec.template.spec.containers[0].ports[1].containerPort
           value: 9090
 
-  - it: adds a config checksum annotation to the pod template when config is set
+  - it: adds a config checksum annotation to the pod template when config is set and the annotation is enabled
     template: deployment.yaml
     set:
+      configChecksumAnnotation: true
       config:
         LOG_LEVEL: debug
     asserts:
       - matchRegex:
           path: spec.template.metadata.annotations["checksum/config"]
           pattern: "^[0-9a-f]{64}$"
+
+  # The flag defaults to false, so config alone must not produce the
+  # annotation -- this is what keeps an ArgoCD-managed app from rolling its
+  # pods on config edits it does not need a restart for.
+  - it: omits the config checksum annotation when config is set but the annotation is disabled
+    template: deployment.yaml
+    set:
+      config:
+        LOG_LEVEL: debug
+    asserts:
+      - notExists:
+          path: spec.template.metadata.annotations
+
+  - it: omits the config checksum annotation when explicitly disabled
+    template: deployment.yaml
+    set:
+      configChecksumAnnotation: false
+      config:
+        LOG_LEVEL: debug
+    asserts:
+      - notExists:
+          path: spec.template.metadata.annotations["checksum/config"]
+
+  # Enabling the flag with no config to hash must stay a no-op rather than
+  # annotating a digest of nothing.
+  - it: omits the config checksum annotation when enabled but no config is set
+    template: deployment.yaml
+    set:
+      configChecksumAnnotation: true
+    asserts:
+      - notExists:
+          path: spec.template.metadata.annotations
 
   - it: omits the config checksum annotation when no config is set
     template: deployment.yaml
@@ -431,40 +464,51 @@ tests:
       - notExists:
           path: spec.template.metadata.annotations
 
-  # These two tests used to pin absolute golden hashes. They cannot be:
-  # checksum/config is sha256 of the *rendered* configmap.yaml
-  # (_metadata.tpl), whose metadata.labels carry
-  # `helm.sh/chart: generic-app-chart-<Chart.Version>`. So the hash changes on
-  # every release-please version bump, independently of any config content.
-  # The pinned values were generated at chart 0.4.0 and broke at 0.4.1 -- which
-  # nothing caught, because until pr-ci.yml this suite was never run.
+  # Golden-value pair. These were briefly removed as unpinnable, because the
+  # checksum used to hash the *rendered* configmap.yaml -- whose labels carry
+  # `helm.sh/chart: <name>-<Chart.Version>`, so the digest changed on every
+  # release-please bump and the goldens rotted (generated at 0.4.0, broken at
+  # 0.4.1, unnoticed because nothing ran this suite).
   #
-  # Re-pinning them would be worse than deleting them: validate-chart is a
-  # required check gating Renovate automerge, so a hash that rots on every
-  # release would turn the gate red at each version bump and block all merges,
-  # release PRs included.
-  #
-  # What is asserted instead is what holds across versions: the annotation is
-  # a well-formed sha256 and is present only when config is set.
-  #
-  # Content-sensitivity is deliberately NOT asserted. helm-unittest evaluates
-  # one render per test, so comparing the hashes of two different config
-  # payloads is not expressible, and a `notEqual` against a hard-coded hash is
-  # a tautology that passes whatever the template does. The property is
-  # instead structural: _metadata.tpl hashes the rendered configmap.yaml,
-  # which embeds .Values.config, so the hash cannot be insensitive to config
-  # content.
-  - it: renders a well-formed checksum for a known config payload
+  # Now that the checksum hashes .Values.config alone, the digest is a pure
+  # function of config content and pinning it is both stable and meaningful
+  # again: sha256("LOG_LEVEL: debug"), the exact bytes Helm's toYaml produces
+  # for this map (keys sorted, no trailing newline). The pair below is what
+  # proves the checksum is genuinely content-derived rather than merely
+  # present -- a stronger claim than a shape match, and one that also fails
+  # loudly if the hash input is ever widened back to something that drags in
+  # chart metadata.
+  - it: pins the checksum for a known config payload (golden value)
     template: deployment.yaml
     release:
       name: myrelease
     set:
+      configChecksumAnnotation: true
       config:
         LOG_LEVEL: debug
     asserts:
-      - matchRegex:
+      - equal:
           path: spec.template.metadata.annotations["checksum/config"]
-          pattern: "^[0-9a-f]{64}$"
+          value: d932dbbb3b3dd8beee7bbd56077ed70743fd8fc05445a8807139c05253e5e899
+
+  # Same release and chart version as the golden above -- only the config
+  # value differs -- so a differing digest isolates config content as the
+  # cause.
+  - it: changes the checksum when config content changes
+    template: deployment.yaml
+    release:
+      name: myrelease
+    set:
+      configChecksumAnnotation: true
+      config:
+        LOG_LEVEL: verbose
+    asserts:
+      - equal:
+          path: spec.template.metadata.annotations["checksum/config"]
+          value: a36a7f7af8a1c9c8c7c41be7f184c66f6cf14f3e707015fbf417ba6f5c936412
+      - notEqual:
+          path: spec.template.metadata.annotations["checksum/config"]
+          value: d932dbbb3b3dd8beee7bbd56077ed70743fd8fc05445a8807139c05253e5e899
 
   - it: omits nodeSelector when unset
     template: deployment.yaml
@@ -646,20 +690,6 @@ tests:
       - notExists:
           path: spec.template.spec.affinity
 
-  # Second payload of the pair above -- see that comment for why the hash is
-  # matched by shape rather than pinned to a constant.
-  - it: renders a well-formed checksum for a different config payload
-    template: deployment.yaml
-    release:
-      name: myrelease
-    set:
-      config:
-        LOG_LEVEL: verbose
-    asserts:
-      - matchRegex:
-          path: spec.template.metadata.annotations["checksum/config"]
-          pattern: "^[0-9a-f]{64}$"
-
   # Generic metadata passthrough.
   - it: adds commonAnnotations to the Deployment's own metadata
     template: deployment.yaml
@@ -770,6 +800,7 @@ tests:
   - it: never lets podAnnotations override the checksum/config annotation
     template: deployment.yaml
     set:
+      configChecksumAnnotation: true
       config:
         LOG_LEVEL: debug
       podAnnotations:
@@ -782,6 +813,7 @@ tests:
   - it: never lets commonAnnotations override the checksum/config annotation
     template: deployment.yaml
     set:
+      configChecksumAnnotation: true
       config:
         LOG_LEVEL: debug
       commonAnnotations:
@@ -790,6 +822,21 @@ tests:
       - matchRegex:
           path: spec.template.metadata.annotations["checksum/config"]
           pattern: "^[0-9a-f]{64}$"
+
+  # With the annotation disabled, a user-supplied checksum/config is just an
+  # ordinary annotation -- there is no chart-managed value to protect, so the
+  # passthrough must not be silently swallowed.
+  - it: passes through a user-supplied checksum/config when the annotation is disabled
+    template: deployment.yaml
+    set:
+      config:
+        LOG_LEVEL: debug
+      podAnnotations:
+        checksum/config: user-owned
+    asserts:
+      - equal:
+          path: spec.template.metadata.annotations["checksum/config"]
+          value: user-owned
 
   - it: merges commonAnnotations into the pod template alongside podAnnotations
     template: deployment.yaml
