@@ -1,29 +1,21 @@
 # Naming/labels (_helpers.tpl). Cross-cutting: every rendered resource
-# must derive its name from release+chart (overridable via fullnameOverride/
-# nameOverride) and carry the same common + selector labels. Exercised here
+# must be named after the release (overridable via fullnameOverride) and carry
+# the same common + selector labels. Exercised here
 # against deployment.yaml; other modules' suites re-assert the same helper
 # output as each resource is added, proving the helper is applied consistently.
 suite: generic-app-chart naming and labels
 templates:
   - deployment.yaml
 tests:
-  - it: derives the fullname from release name and chart name by default
+  - it: names the resource after the release by default
     release:
       name: my-app
     asserts:
       - equal:
           path: metadata.name
-          value: my-app-generic-app-chart
+          value: my-app
 
-  - it: does not double the chart name when the release name already contains it
-    release:
-      name: my-generic-app-chart
-    asserts:
-      - equal:
-          path: metadata.name
-          value: my-generic-app-chart
-
-  - it: honors fullnameOverride over the derived name
+  - it: honors fullnameOverride over the release name
     release:
       name: my-app
     set:
@@ -33,7 +25,7 @@ tests:
           path: metadata.name
           value: custom-name
 
-  - it: honors nameOverride when deriving the fullname
+  - it: leaves the resource name untouched when nameOverride is set
     release:
       name: my-app
     set:
@@ -41,7 +33,10 @@ tests:
     asserts:
       - equal:
           path: metadata.name
-          value: my-app-widget
+          value: my-app
+      - equal:
+          path: metadata.labels["app.kubernetes.io/name"]
+          value: widget
 
   - it: applies standard Helm common labels
     release:

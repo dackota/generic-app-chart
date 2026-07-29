@@ -85,13 +85,13 @@ tests:
           value:
             - group: ""
               kind: Secret
-              name: my-app-generic-app-chart-tls
+              name: my-app-tls
       - notContains:
           path: spec.to
           content:
             group: ""
             kind: Service
-            name: my-app-generic-app-chart
+            name: my-app
 
   # Generic metadata passthrough.
   - it: adds commonLabels and commonAnnotations to the ReferenceGrant

@@ -336,7 +336,7 @@ tests:
           value: 100m
       - equal:
           path: spec.template.spec.serviceAccountName
-          value: RELEASE-NAME-generic-app-chart
+          value: RELEASE-NAME
 
   - it: always sets sane default resource requests and limits
     template: deployment.yaml
@@ -379,7 +379,7 @@ tests:
     asserts:
       - equal:
           path: spec.template.spec.serviceAccountName
-          value: my-app-generic-app-chart
+          value: my-app
 
   - it: references an overridden ServiceAccount name from the pod spec
     template: deployment.yaml
@@ -1011,7 +1011,7 @@ tests:
           content:
             name: data
             persistentVolumeClaim:
-              claimName: my-app-generic-app-chart
+              claimName: my-app
       - contains:
           path: spec.template.spec.volumes
           content:

@@ -28,7 +28,7 @@ tests:
           value:
             apiVersion: apps/v1
             kind: Deployment
-            name: my-app-generic-app-chart
+            name: my-app
       - equal:
           path: spec.minReplicas
           value: 3

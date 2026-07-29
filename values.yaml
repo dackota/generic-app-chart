@@ -1,9 +1,9 @@
 # Default values for generic-app-chart.
 # This is a YAML-formatted file — see README.md for the full reference.
 
-# Derived names default to "<release>-<chart>" (or just "<release>" when
-# the release name already contains the chart name). Override either to
-# control the name every resource in this chart is rendered under.
+# Every resource is rendered under the release name. fullnameOverride replaces
+# that name outright; nameOverride only changes the chart name reported in the
+# app.kubernetes.io/name label (and the selectors built from it).
 nameOverride: ""
 fullnameOverride: ""
 
