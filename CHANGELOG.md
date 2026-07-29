@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.2](https://github.com/dackota/generic-app-chart/compare/v2.0.1...v2.0.2) (2026-07-29)
+
+
+### Bug Fixes
+
+* **ci:** pass --verify=false to helm plugin install under Helm v4 ([#32](https://github.com/dackota/generic-app-chart/issues/32)) ([dea72fd](https://github.com/dackota/generic-app-chart/commit/dea72fd04a6daf33d612ff89b424ac2c5bc5d433))
+
 ## [2.0.1](https://github.com/dackota/generic-app-chart/compare/v2.0.0...v2.0.1) (2026-07-29)
 
 
