@@ -83,3 +83,30 @@ tests:
       - equal:
           path: metadata.annotations["owner"]
           value: platform-team
+
+  - it: omits the behavior block when unset
+    set:
+      autoscaling:
+        enabled: true
+    asserts:
+      - notExists:
+          path: spec.behavior
+
+  - it: renders a native scaling behavior passthrough verbatim when set
+    set:
+      autoscaling:
+        enabled: true
+        behavior:
+          scaleDown:
+            stabilizationWindowSeconds: 300
+            policies:
+              - type: Pods
+                value: 1
+                periodSeconds: 60
+    asserts:
+      - equal:
+          path: spec.behavior.scaleDown.stabilizationWindowSeconds
+          value: 300
+      - equal:
+          path: spec.behavior.scaleDown.policies[0].type
+          value: Pods

@@ -1242,3 +1242,76 @@ tests:
           path: spec.strategy.rollingUpdate.maxSurge
       - notExists:
           path: spec.strategy.rollingUpdate.maxUnavailable
+
+  # Image digest pinning.
+  - it: pins the image by digest when image.digest is set, ignoring the tag
+    template: deployment.yaml
+    set:
+      image:
+        repository: ghcr.io/example/app
+        tag: "9.9.9"
+        digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: ghcr.io/example/app@sha256:0000000000000000000000000000000000000000000000000000000000000000
+
+  # Service links.
+  - it: disables service links on the pod spec by default
+    template: deployment.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.enableServiceLinks
+          value: false
+
+  - it: renders enableServiceLinks true when opted back in
+    template: deployment.yaml
+    set:
+      enableServiceLinks: true
+    asserts:
+      - equal:
+          path: spec.template.spec.enableServiceLinks
+          value: true
+
+  # initContainers / extraContainers passthrough.
+  - it: omits initContainers and renders only the app container by default
+    template: deployment.yaml
+    asserts:
+      - notExists:
+          path: spec.template.spec.initContainers
+      - lengthEqual:
+          path: spec.template.spec.containers
+          count: 1
+
+  - it: renders initContainers verbatim when set
+    template: deployment.yaml
+    set:
+      initContainers:
+        - name: migrate
+          image: ghcr.io/example/app:1.0.0
+          command: ["/app/migrate"]
+    asserts:
+      - equal:
+          path: spec.template.spec.initContainers[0].name
+          value: migrate
+      - equal:
+          path: spec.template.spec.initContainers[0].command[0]
+          value: /app/migrate
+
+  - it: renders extraContainers as sidecars after the app container
+    template: deployment.yaml
+    set:
+      extraContainers:
+        - name: log-shipper
+          image: ghcr.io/example/shipper:2.0.0
+    asserts:
+      - lengthEqual:
+          path: spec.template.spec.containers
+          count: 2
+      - equal:
+          path: spec.template.spec.containers[1].name
+          value: log-shipper
+      # The app container stays first and untouched.
+      - equal:
+          path: spec.template.spec.containers[0].name
+          value: generic-app-chart

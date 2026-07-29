@@ -1,0 +1,86 @@
+# Namespace (namespace.yaml). Opt-in: renders the release namespace itself,
+# labeled with Pod Security Admission levels so the chart's restricted pod
+# defaults are enforced at admission for everything in the namespace.
+suite: generic-app-chart Namespace
+templates:
+  - namespace.yaml
+tests:
+  - it: renders no Namespace by default
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders the release namespace with restricted PSA labels when namespace.create is enabled
+    release:
+      namespace: my-app-ns
+    set:
+      namespace:
+        create: true
+    asserts:
+      - isKind:
+          of: Namespace
+      - equal:
+          path: metadata.name
+          value: my-app-ns
+      - equal:
+          path: metadata.labels["pod-security.kubernetes.io/enforce"]
+          value: restricted
+      - equal:
+          path: metadata.labels["pod-security.kubernetes.io/audit"]
+          value: restricted
+      - equal:
+          path: metadata.labels["pod-security.kubernetes.io/warn"]
+          value: restricted
+
+  - it: honors overridden PSA levels, omits a level set to the empty-string sentinel, and passes version keys through
+    set:
+      namespace:
+        create: true
+        podSecurityStandards:
+          enforce: baseline
+          enforce-version: v1.30
+          audit: ""
+          warn: restricted
+    asserts:
+      - equal:
+          path: metadata.labels["pod-security.kubernetes.io/enforce"]
+          value: baseline
+      - equal:
+          path: metadata.labels["pod-security.kubernetes.io/enforce-version"]
+          value: v1.30
+      - notExists:
+          path: metadata.labels["pod-security.kubernetes.io/audit"]
+      - equal:
+          path: metadata.labels["pod-security.kubernetes.io/warn"]
+          value: restricted
+
+  - it: merges namespace labels/annotations with commonLabels/commonAnnotations, never letting a plain label clobber a PSA or chart-managed key
+    set:
+      namespace:
+        create: true
+        labels:
+          team-ns-label: "yes"
+          pod-security.kubernetes.io/enforce: privileged
+        annotations:
+          field.cattle.io/projectId: p-abc
+      commonLabels:
+        team: platform
+      commonAnnotations:
+        owner: platform-team
+    asserts:
+      - equal:
+          path: metadata.labels["team-ns-label"]
+          value: "yes"
+      - equal:
+          path: metadata.labels["team"]
+          value: platform
+      # A PSA mode can only be changed through podSecurityStandards.
+      - equal:
+          path: metadata.labels["pod-security.kubernetes.io/enforce"]
+          value: restricted
+      - equal:
+          path: metadata.annotations["field.cattle.io/projectId"]
+          value: p-abc
+      - equal:
+          path: metadata.annotations["owner"]
+          value: platform-team

@@ -1,19 +1,23 @@
-# NetworkPolicy (networkpolicy.yaml).
+# NetworkPolicy (networkpolicy.yaml). On by default: default-deny ingress
+# with allowances derived from what the app enables (same-namespace always,
+# gateway only under routing.enabled, monitoring only under the metrics
+# surface), unrestricted egress until restrictEgress/additionalEgress
+# activates it (then DNS is allowed automatically).
 suite: generic-app-chart NetworkPolicy
 templates:
   - networkpolicy.yaml
 tests:
-  - it: renders no NetworkPolicy when disabled
+  - it: renders no NetworkPolicy when explicitly disabled
+    set:
+      networkPolicy:
+        enabled: false
     asserts:
       - hasDocuments:
           count: 0
 
-  - it: renders a default-deny-ingress NetworkPolicy scoped to this app's pods, allowing only the configured gateway namespace, when enabled
+  - it: renders a default-deny-ingress NetworkPolicy by default, allowing only same-namespace pods for a cluster-only app
     release:
       name: my-app
-    set:
-      networkPolicy:
-        enabled: true
     asserts:
       - isKind:
           of: NetworkPolicy
@@ -30,16 +34,47 @@ tests:
           path: spec.policyTypes
           content: Egress
           any: true
+      # Cluster-only (routing off) and no metrics surface: the sole
+      # allowance is intra-namespace traffic — the gateway gets no rule.
       - equal:
-          path: spec.ingress[0].from[0].namespaceSelector.matchLabels["kubernetes.io/metadata.name"]
-          value: traefik
+          path: spec.ingress
+          value:
+            - from:
+                - podSelector: {}
       - notExists:
           path: spec.egress
 
-  - it: honors a custom gateway namespaceSelector and podSelector
+  - it: omits ingress rules entirely (deny all ingress) when allowSameNamespace is opted out on a cluster-only app
     set:
       networkPolicy:
+        allowSameNamespace: false
+    asserts:
+      - contains:
+          path: spec.policyTypes
+          content: Ingress
+      - notExists:
+          path: spec.ingress
+
+  - it: allows the gateway namespace only while routing is enabled
+    set:
+      routing:
         enabled: true
+        hostnames: [app.example.com]
+    asserts:
+      - equal:
+          path: spec.ingress[0].from[0].podSelector
+          value: {}
+      - equal:
+          path: spec.ingress[1].from[0].namespaceSelector.matchLabels["kubernetes.io/metadata.name"]
+          value: traefik
+
+  - it: honors a custom gateway namespaceSelector and podSelector
+    set:
+      routing:
+        enabled: true
+        hostnames: [app.example.com]
+      networkPolicy:
+        allowSameNamespace: false
         gateway:
           namespaceSelector:
             matchLabels:
@@ -55,16 +90,64 @@ tests:
           path: spec.ingress[0].from[0].podSelector.matchLabels["app.kubernetes.io/name"]
           value: traefik
 
-  - it: adds Egress to policyTypes and renders the configured egress rules when additionalEgress is set
+  - it: allows the monitoring namespace only while the metrics surface is enabled
     set:
       networkPolicy:
-        enabled: true
+        allowSameNamespace: false
+      metrics:
+        scrape:
+          enabled: true
+    asserts:
+      - equal:
+          path: spec.ingress[0].from[0].namespaceSelector.matchLabels["kubernetes.io/metadata.name"]
+          value: monitoring
+
+  - it: allows monitoring for the serviceMonitor half of the metrics surface too, honoring a custom monitoring selector
+    set:
+      networkPolicy:
+        allowSameNamespace: false
+        monitoring:
+          namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: observability
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: prometheus
+      metrics:
+        serviceMonitor:
+          enabled: true
+    asserts:
+      - equal:
+          path: spec.ingress[0].from[0].namespaceSelector.matchLabels["kubernetes.io/metadata.name"]
+          value: observability
+      - equal:
+          path: spec.ingress[0].from[0].podSelector.matchLabels["app.kubernetes.io/name"]
+          value: prometheus
+
+  - it: appends additionalIngress rules after the derived allowances
+    set:
+      networkPolicy:
+        additionalIngress:
+          - from:
+              - namespaceSelector:
+                  matchLabels:
+                    kubernetes.io/metadata.name: other-app
+    asserts:
+      - equal:
+          path: spec.ingress[1].from[0].namespaceSelector.matchLabels["kubernetes.io/metadata.name"]
+          value: other-app
+
+  - it: adds Egress to policyTypes, an automatic DNS allowance, and the configured egress rules when additionalEgress is set
+    set:
+      networkPolicy:
         additionalEgress:
           - to:
-              - namespaceSelector: {}
+              - namespaceSelector:
+                  matchLabels:
+                    kubernetes.io/metadata.name: database
             ports:
-              - protocol: UDP
-                port: 53
+              - protocol: TCP
+                port: 5432
     asserts:
       - contains:
           path: spec.policyTypes
@@ -73,16 +156,64 @@ tests:
           path: spec.egress
           value:
             - to:
-                - namespaceSelector: {}
+                - namespaceSelector:
+                    matchLabels:
+                      kubernetes.io/metadata.name: kube-system
+                  podSelector:
+                    matchLabels:
+                      k8s-app: kube-dns
               ports:
                 - protocol: UDP
                   port: 53
+                - protocol: TCP
+                  port: 53
+            - to:
+                - namespaceSelector:
+                    matchLabels:
+                      kubernetes.io/metadata.name: database
+              ports:
+                - protocol: TCP
+                  port: 5432
+
+  - it: restrictEgress alone activates default-deny egress with only the DNS allowance
+    set:
+      networkPolicy:
+        restrictEgress: true
+    asserts:
+      - contains:
+          path: spec.policyTypes
+          content: Egress
+      - equal:
+          path: spec.egress[0].to[0].podSelector.matchLabels["k8s-app"]
+          value: kube-dns
+      - lengthEqual:
+          path: spec.egress
+          count: 1
+
+  - it: restrictEgress with allowDNS opted out renders Egress with no rules at all (deny all egress)
+    set:
+      networkPolicy:
+        restrictEgress: true
+        allowDNS: false
+    asserts:
+      - contains:
+          path: spec.policyTypes
+          content: Egress
+      - notExists:
+          path: spec.egress
+
+  - it: leaves egress unrestricted (no Egress policyType) by default
+    asserts:
+      - notContains:
+          path: spec.policyTypes
+          content: Egress
+          any: true
+      - notExists:
+          path: spec.egress
 
   # Generic metadata passthrough.
   - it: adds commonLabels and commonAnnotations to the NetworkPolicy
     set:
-      networkPolicy:
-        enabled: true
       commonLabels:
         team: platform
       commonAnnotations:

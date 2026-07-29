@@ -1,0 +1,35 @@
+{{/*
+Namespace. Opt-in (namespace.create, default false) for the
+one-app-per-namespace model: renders the release namespace itself, labeled
+with Pod Security Admission levels (restricted by default) so the chart's
+pod-level security posture is enforced by the API server at admission, not
+just rendered into specs. Only turn this on when this release is what defines
+the namespace — a pre-existing or externally-created namespace can't be
+adopted by Helm, and `helm uninstall` deletes a chart-owned namespace along
+with everything in it.
+
+Label precedence, weakest to strongest: namespace.labels, then the PSA labels
+derived from namespace.podSecurityStandards, then the chart-managed label set
+(which already folds commonLabels in) — chart-managed keys can never be
+clobbered, and a PSA mode can only be changed through podSecurityStandards
+(set a mode to "" to omit it), not smuggled in via a plain label.
+*/}}
+{{- if .Values.namespace.create }}
+{{- $psa := dict -}}
+{{- range $mode, $level := .Values.namespace.podSecurityStandards -}}
+{{- if $level -}}
+{{- $_ := set $psa (printf "pod-security.kubernetes.io/%s" $mode) ($level | toString) -}}
+{{- end -}}
+{{- end -}}
+{{- $labels := mergeOverwrite (deepCopy (.Values.namespace.labels | default dict)) $psa (include "generic-app-chart.labels" . | fromYaml) -}}
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .Release.Namespace }}
+  labels:
+    {{- toYaml $labels | nindent 4 }}
+  {{- with (include "generic-app-chart.mergeAnnotations" (dict "common" .Values.commonAnnotations "specific" .Values.namespace.annotations)) }}
+  annotations:
+    {{- nindent 4 . }}
+  {{- end }}
+{{- end }}

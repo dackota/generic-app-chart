@@ -23,6 +23,11 @@ spec:
   {{- else }}
   minAvailable: {{ .Values.pdb.minAvailable }}
   {{- end }}
+  {{- with .Values.pdb.unhealthyPodEvictionPolicy }}
+  # Running-but-not-Ready pods stay evictable even when the budget is
+  # exhausted, so a crash-looping app can't wedge a node drain.
+  unhealthyPodEvictionPolicy: {{ . }}
+  {{- end }}
   selector:
     matchLabels:
       {{- include "generic-app-chart.selectorLabels" . | nindent 6 }}

@@ -11,6 +11,10 @@ image:
   repository: ""
   # Defaults to .Chart.AppVersion when unset.
   tag: ""
+  # Optional immutable digest ("sha256:..."). When set, the image is pinned
+  # by digest — "<repository>@<digest>" — and `tag` is ignored, so the
+  # deployed bits can never drift under a re-pushed tag.
+  digest: ""
   pullPolicy: IfNotPresent
 
 # References existing (referenced) image-pull Secret(s) by name for
@@ -85,7 +89,15 @@ updateStrategy:
   maxUnavailable: ""
 
 # No pod automatically mounts its ServiceAccount token unless opted in.
+# Mirrored onto the ServiceAccount resource itself (serviceaccount.yaml) as
+# defense in depth, so any other pod reusing this SA inherits the same default.
 automountServiceAccountToken: false
+
+# Kubernetes injects legacy Docker-link-style env vars ({SVC}_SERVICE_HOST,
+# ...) for every Service in the namespace into every pod by default — clutter
+# at best, an information leak and env-size problem at worst. Off by default;
+# set true for legacy apps that discover services through those vars.
+enableServiceLinks: false
 
 # Seconds Kubernetes waits after sending SIGTERM before force-killing the
 # pod; override for apps that need longer (or shorter) to drain in-flight
@@ -148,6 +160,20 @@ extraEmptyDirs: []
 extraVolumes: []
 extraVolumeMounts: []
 
+# Native Container entries rendered verbatim. initContainers run before the
+# app container (migrations, permission fixups); extraContainers run alongside
+# it as sidecars (log shippers, proxies). Neither inherits the chart's
+# container securityContext defaults — set securityContext explicitly on each
+# entry, since a restricted-PSA namespace (see `namespace` below) will reject
+# containers without one.
+#   initContainers:
+#     - name: migrate
+#       image: ghcr.io/example/app:1.0.0
+#       command: ["/app/migrate"]
+#       securityContext: {...}
+initContainers: []
+extraContainers: []
+
 # Requests AND limits are always set; override wholesale for a hungrier app.
 resources:
   requests:
@@ -184,6 +210,29 @@ affinity: {}
 serviceAccount:
   create: true
   name: ""
+  annotations: {}
+
+# Opt-in Namespace resource for the "one app per namespace" model: renders
+# the release namespace itself, labeled with Pod Security Admission levels so
+# the chart's restricted-PSA pod defaults are *enforced* at the namespace
+# boundary, not just rendered. Off by default because ownership of an
+# already-existing namespace can't be assumed (plain `helm install
+# --create-namespace` and pre-created namespaces would conflict); turn it on
+# when this release is what defines the namespace — e.g. an ArgoCD Application
+# syncing into its own namespace. Note that `helm uninstall` then deletes the
+# namespace and everything in it.
+namespace:
+  create: false
+  # Rendered as pod-security.kubernetes.io/<key>: <value> labels. Set a level
+  # to "" to omit that mode; keys like enforce-version pass through the same
+  # way.
+  podSecurityStandards:
+    enforce: restricted
+    audit: restricted
+    warn: restricted
+  # Extra labels/annotations for the Namespace only, merged with (and
+  # overridden by) commonLabels/commonAnnotations and the PSA labels above.
+  labels: {}
   annotations: {}
 
 # Maps declared ports to the pod's container ports (see deployment.yaml,
@@ -272,13 +321,26 @@ autoscaling:
   targetCPUUtilizationPercentage: 80
   # Omitted from the HPA's metrics when unset.
   targetMemoryUtilizationPercentage: ""
+  # Native HorizontalPodAutoscalerBehavior passthrough (scaleUp/scaleDown
+  # policies and stabilization windows), rendered verbatim; omitted when empty.
+  #   behavior:
+  #     scaleDown:
+  #       stabilizationWindowSeconds: 300
+  behavior: {}
 
-# Opt-in PDB. minAvailable/maxUnavailable are mutually exclusive; set
-# maxUnavailable to use it instead of the default minAvailable.
+# On by default, and safe to leave on: the PDB only renders when the
+# effective replica count is > 1 (pdb.yaml), so single-replica apps never get
+# a budget that would deadlock a node drain. minAvailable/maxUnavailable are
+# mutually exclusive; set maxUnavailable to use it instead of the default
+# minAvailable. Set enabled: false to opt out entirely.
 pdb:
-  enabled: false
+  enabled: true
   minAvailable: 1
   maxUnavailable: ""
+  # Lets the eviction API remove pods that are Running-but-not-Ready even
+  # when the budget is exhausted, so a crash-looping app can't wedge a node
+  # drain forever (needs k8s >=1.27, this chart's floor). Set "" to omit.
+  unhealthyPodEvictionPolicy: AlwaysAllow
 
 # Opt-in observability surface, off by default. Scrape annotations
 # render on the pod template via the generic podAnnotations merge mechanism
@@ -302,12 +364,23 @@ metrics:
     # Prometheus Operator's own global scrape interval).
     interval: ""
 
-# Opt-in default-deny-ingress NetworkPolicy. When enabled, only the
-# configured gateway namespace/pods may reach this app; everything else is
-# denied by default. Egress stays unrestricted unless additionalEgress rules
-# are supplied.
+# Default-deny-ingress NetworkPolicy, on by default. The allowed ingress
+# sources are derived from what the app actually enables:
+#   - pods in this app's own namespace (allowSameNamespace, the
+#     one-app-per-namespace model's intra-app traffic);
+#   - the gateway namespace/pods, only while routing.enabled — a cluster-only
+#     app never needs the gateway to reach it;
+#   - the monitoring namespace, only while the metrics surface
+#     (metrics.scrape or metrics.serviceMonitor) is enabled;
+#   - anything listed under additionalIngress.
+# Everything else is denied. Egress stays unrestricted until either
+# restrictEgress is set or additionalEgress rules are supplied; once egress
+# restriction is active, DNS to kube-dns is allowed automatically
+# (allowDNS) so a locked-down app can still resolve names.
 networkPolicy:
-  enabled: false
+  enabled: true
+  # Allow all pods in this app's own namespace to reach it.
+  allowSameNamespace: true
   gateway:
     namespaceSelector:
       matchLabels:
@@ -315,11 +388,36 @@ networkPolicy:
     # Optional; narrows the allow rule to specific pods within the gateway
     # namespace when set.
     podSelector: {}
-  # Native NetworkPolicyEgressRule entries, e.g. to allow DNS or an external API:
+  # Where Prometheus scrapes from; only rendered while the metrics surface is
+  # enabled. podSelector optionally narrows it, like gateway.podSelector.
+  monitoring:
+    namespaceSelector:
+      matchLabels:
+        kubernetes.io/metadata.name: monitoring
+    podSelector: {}
+  # Native NetworkPolicyIngressRule entries appended to the derived allowances
+  # above, e.g. to let one specific sibling app in:
+  #   additionalIngress:
+  #     - from:
+  #         - namespaceSelector:
+  #             matchLabels:
+  #               kubernetes.io/metadata.name: other-app
+  additionalIngress: []
+  # Default-deny egress too (plus the DNS carve-out below and any
+  # additionalEgress). Off by default — most apps need to reach *something*,
+  # and an empty egress allowlist would break them silently.
+  restrictEgress: false
+  # While egress restriction is active, keep DNS to kube-system's kube-dns
+  # allowed automatically.
+  allowDNS: true
+  # Native NetworkPolicyEgressRule entries. Supplying any activates egress
+  # restriction just like restrictEgress does:
   #   additionalEgress:
   #     - to:
-  #         - namespaceSelector: {}
+  #         - namespaceSelector:
+  #             matchLabels:
+  #               kubernetes.io/metadata.name: database
   #       ports:
-  #         - protocol: UDP
-  #           port: 53
+  #         - protocol: TCP
+  #           port: 5432
   additionalEgress: []

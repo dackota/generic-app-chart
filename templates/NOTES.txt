@@ -1,0 +1,22 @@
+{{ include "generic-app-chart.fullname" . }} deployed to namespace {{ .Release.Namespace }}.
+
+Image: {{ if .Values.image.digest }}{{ .Values.image.repository }}@{{ .Values.image.digest }}{{ else }}{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}{{ end }}
+{{- if not .Values.image.repository }}
+  WARNING: image.repository is empty — the Deployment will not be able to pull an image.
+{{- end }}
+
+{{- if .Values.routing.enabled }}
+Exposed via the {{ .Values.routing.gateway.name }} Gateway at:
+{{- range .Values.routing.hostnames }}
+  http{{ if $.Values.routing.tls.enabled }}s{{ end }}://{{ . }}
+{{- end }}
+{{- else }}
+Cluster-only: reachable in-cluster at {{ include "generic-app-chart.fullname" . }}.{{ .Release.Namespace }}.svc{{ with .Values.service.ports }} ({{ (first .).port }}){{ end }}.
+{{- end }}
+
+{{- if .Values.networkPolicy.enabled }}
+NetworkPolicy: default-deny ingress ({{ if .Values.networkPolicy.allowSameNamespace }}same-namespace{{ if .Values.routing.enabled }} + gateway{{ end }}{{ else if .Values.routing.enabled }}gateway only{{ else }}no derived allowances{{ end }} allowed). Set networkPolicy.enabled=false to opt out.
+{{- end }}
+{{- if .Values.persistence.enabled }}
+Persistence: RWO volume at {{ .Values.persistence.mountPath }} — replicas pinned to 1, strategy Recreate.
+{{- end }}
