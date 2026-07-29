@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.0.0](https://github.com/dackota/generic-app-chart/compare/v0.5.0...v1.0.0) (2026-07-29)
+
+
+### ⚠ BREAKING CHANGES
+
+* apps that set `config` and rely on pods restarting when it changes must now set `configChecksumAnnotation: true`. On upgrade such apps see one final rollout as the annotation is dropped from the pod template. No app in free-tier-oracle-cloud-k8s depends on this today: consulting-spa and resume-website set no config, and change-tracking-dashboard hot-reloads its tracker config.
+
+### Features
+
+* gate the config checksum annotation behind a values flag ([#21](https://github.com/dackota/generic-app-chart/issues/21)) ([4252f16](https://github.com/dackota/generic-app-chart/commit/4252f16b3ddab5b06d8eacbc1b422c84405be68c))
+
+
+### Bug Fixes
+
+* **release-please:** enable auto-merge instead of racing the required check ([#23](https://github.com/dackota/generic-app-chart/issues/23)) ([abbb9a4](https://github.com/dackota/generic-app-chart/commit/abbb9a49341c028b3bbf0f5a0559502d2ec4f037))
+
 ## [0.5.0](https://github.com/dackota/generic-app-chart/compare/v0.4.1...v0.5.0) (2026-07-29)
 
 
