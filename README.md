@@ -33,8 +33,7 @@ helm install my-app oci://ghcr.io/dackota/charts/generic-app-chart --version <x.
 ```
 
 A consuming `gitops/workloads/<app>` typically vendors this chart as a
-dependency in its own thin `Chart.yaml` plus a `values.yaml` — see the
-`personal-generic-app-chart` PRD for that pattern.
+dependency in its own thin `Chart.yaml` plus a `values.yaml` — see the [change-tracking-dashboard app](https://github.com/dackota/free-tier-oracle-cloud-k8s/blob/main/gitops/workloads/change-tracking-dashboard/Chart.yaml) in my Gitops repo for an example.
 
 ## What this chart renders
 
@@ -97,9 +96,8 @@ dependency in its own thin `Chart.yaml` plus a `values.yaml` — see the
   named metrics port for Prometheus Operator to scrape.
 
 This chart never renders a Secret resource. It consumes existing in-cluster
-Secrets only, via `envFrom.secretRef` / `env[].valueFrom.secretKeyRef` — see
-CONTEXT.md's "referenced Secret". Getting a Secret into the cluster is a
-platform concern outside this chart.
+Secrets only, via `envFrom.secretRef` / `env[].valueFrom.secretKeyRef`. Getting a Secret into the cluster is a
+platform concern outside this chart, see External Secrets Operator for example.
 
 ## Strict security defaults
 
@@ -147,8 +145,8 @@ cert-manager `Certificate`, also in this app's own namespace, against the
 configured `issuerRef`, targeting `routing.tls.secretName` (defaults to
 `<fullname>-tls`).
 
-This is the Gateway API project's own documented multi-tenancy pattern (ADR
-0001): apps self-serve their own Route + Certificate; the platform's shared
+This is the Gateway API project's own documented multi-tenancy pattern:
+apps self-serve their own Route + Certificate; the platform's shared
 Gateway opts in via `allowedRoutes` on its listener(s) and only needs a
 `ReferenceGrant` for the one genuinely cross-namespace reference this
 creates — its own listener reading this app's TLS Secret. That
@@ -231,9 +229,6 @@ Both off by default:
   (that port name must already exist under `service.ports`). Requires the
   prometheus-operator CRDs to be installed cluster-side.
 
-This is infra-only: it does not instrument application code with RED
-metrics, and it does not wire a custom-metric HPA off scraped values.
-
 ## Generic metadata passthrough
 
 - `podAnnotations`/`podLabels` add to the pod template only, merged with (and
@@ -279,12 +274,6 @@ Releases are cut by [release-please](https://github.com/googleapis/release-pleas
 helm`, bumping `Chart.yaml`'s `version`). On a `v*` tag, `.github/workflows/release.yml`
 packages the chart and pushes it to `oci://ghcr.io/dackota/charts/generic-app-chart`
 using the workflow's `GITHUB_TOKEN` (`packages: write`) for GHCR auth.
-
-**Manual one-time step:** GHCR packages default to private. After the first
-publish, a repo maintainer must set the `generic-app-chart` package's
-visibility to **public** by hand in GitHub (Package settings → Change
-visibility) — this cannot be done from a workflow file, and its absence is
-not a CI failure.
 
 ## Values validation
 
