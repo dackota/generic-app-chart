@@ -58,7 +58,7 @@ jobs:
           # Validating with a current Helm is the more useful check, since
           # ArgoCD renders this chart with its own bundled Helm rather than
           # the one release.yml packages with. Matches release.yml's pin.
-          version: v4.2.3
+          version: v4.2.4
 
       - name: helm lint (every values fixture)
         run: |
